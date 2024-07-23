@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-walkdir = "*"
+walkdir = "2.3.2"
+mockall = "0.10.2"
+termion = "1.5.6"
