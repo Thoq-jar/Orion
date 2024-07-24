@@ -12,6 +12,10 @@ sudo ./Orion --verbose
 cd ..
 cd ..
 ```
+or if you prefer a 1-liner:
+```bash
+chmod +x orion && ./orion
+```
 
 [Thoq-License](https://raw.githubusercontent.com/Thoq-jar/Thoq-License/main/License)
 
@@ -29,3 +33,5 @@ sudo mv Orion /usr/local/bin/
 cd ~
 rm -rf .otemp
 ```
+
+Installer soon™
