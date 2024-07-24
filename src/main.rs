@@ -3,7 +3,6 @@ use std::sync::*;
 use std::time::*;
 use std::*;
 use rayon::iter::*;
-use rayon::ThreadPool;
 use walkdir::WalkDir;
 
 #[derive(Debug)]
@@ -17,7 +16,6 @@ struct FileSearcher {
     results: Arc<Mutex<Vec<SearchResult>>>,
     root_dir: String,
     start_time: Instant,
-    thread_pool: ThreadPool,
 }
 
 impl FileSearcher {
@@ -27,7 +25,6 @@ impl FileSearcher {
             results: Arc::new(Mutex::new(Vec::new())),
             root_dir,
             start_time: Instant::now(),
-            thread_pool: rayon::ThreadPoolBuilder::new().num_threads(16).build().unwrap()
         }
     }
 
