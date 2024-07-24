@@ -125,3 +125,60 @@ fn main() {
     file_searcher.search(&root_dir, verbose);
     file_searcher.display_results();
 }
+
+// Tests
+#[cfg(test)]
+mod file_searcher_tests {
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+    use crate::FileSearcher;
+
+    #[test]
+    fn finds_file_matching_query() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "This is a test file.").unwrap();
+
+        let searcher = FileSearcher::new("test_file.txt".to_string(), dir.path().to_str().unwrap().to_string());
+        searcher.search(dir.path().to_str().unwrap(), false);
+
+        let results = searcher.results.lock().unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, file_path.to_str().unwrap());
+    }
+
+    #[test]
+    fn does_not_find_file_when_query_does_not_match() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        File::create(&file_path).unwrap();
+
+        let searcher = FileSearcher::new("nonexistent".to_string(), dir.path().to_str().unwrap().to_string());
+        searcher.search(dir.path().to_str().unwrap(), false);
+
+        let results = searcher.results.lock().unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn handles_nonexistent_directory_gracefully() {
+        let searcher = FileSearcher::new("anything".to_string(), "nonexistent_directory".to_string());
+        searcher.search("nonexistent_directory", false);
+
+        let results = searcher.results.lock().unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn verbose_mode_prints_additional_information() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("verbose_test_file.txt");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "Verbose mode test.").unwrap();
+
+        let searcher = FileSearcher::new("verbose_test_file.txt".to_string(), dir.path().to_str().unwrap().to_string());
+        searcher.search(dir.path().to_str().unwrap(), true);
+    }
+}
