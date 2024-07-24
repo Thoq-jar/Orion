@@ -1,18 +1,23 @@
-use std::*;
 use std::io::*;
 use std::sync::*;
 use std::time::*;
+use std::*;
+use rayon::iter::*;
+use rayon::ThreadPool;
+use walkdir::WalkDir;
 
 #[derive(Debug)]
 struct SearchResult {
     path: String,
 }
 
+
 struct FileSearcher {
     query: String,
     results: Arc<Mutex<Vec<SearchResult>>>,
     root_dir: String,
     start_time: Instant,
+    thread_pool: ThreadPool,
 }
 
 impl FileSearcher {
@@ -22,44 +27,44 @@ impl FileSearcher {
             results: Arc::new(Mutex::new(Vec::new())),
             root_dir,
             start_time: Instant::now(),
+            thread_pool: rayon::ThreadPoolBuilder::new().num_threads(16).build().unwrap()
         }
     }
 
     fn search(&self, root_dir: &str, verbose: bool) {
-        println!("\n[Orion] Searching for files...");
+    println!("\n[Orion] Searching for files...");
 
-        let results = Arc::clone(&self.results);
-        let query = self.query.clone();
+    let results = Arc::clone(&self.results);
+    let query = self.query.clone();
 
-        let walker = walkdir::WalkDir::new(root_dir).into_iter();
-        for entry in walker {
-            match entry {
-                Ok(entry) => {
-                    if entry.file_type().is_file() {
-                        let filename = entry.file_name().to_string_lossy().to_string();
-                        if verbose {
-                            println!(
-                                "[VM] Orion Currently processing: {}",
-                                entry.path().display()
-                            );
-                        }
-                        if filename.contains(&query) {
-                            let mut results = results.lock().unwrap();
-                            results.push(SearchResult {
-                                path: entry.path().display().to_string(),
-                            });
-                            if verbose {
-                                println!("[Orion] Found match: {}", entry.path().display());
-                            }
-                        }
-                    }
-                }
+    WalkDir::new(root_dir)
+        .into_iter()
+        .par_bridge()
+        .for_each(|entry| {
+            let entry = match entry {
+                Ok(entry) => entry,
                 Err(err) => {
                     println!("[Orion] Error: {} | Continuing...", err);
+                    return;
+                }
+            };
+
+            if verbose {
+                println!("[VM] Orion Currently processing: {}", entry.path().display());
+            }
+
+            if entry.file_type().is_file() && entry.file_name().to_string_lossy().contains(&query) {
+                let path_display = entry.path().display().to_string();
+                let mut results = results.lock().unwrap();o
+                results.push(SearchResult {
+                    path: path_display.clone(),
+                });
+                if verbose {
+                    println!("[Orion] Found match: {}", path_display);
                 }
             }
-        }
-    }
+        });
+}
 
     fn display_results(&self) {
         let results = self.results.lock().unwrap();
@@ -128,10 +133,10 @@ fn main() {
 
 #[cfg(test)]
 mod file_searcher_tests {
+    use crate::FileSearcher;
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
-    use crate::FileSearcher;
 
     #[test]
     fn finds_file_matching_query() {
@@ -140,7 +145,10 @@ mod file_searcher_tests {
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "This is a test file.").unwrap();
 
-        let searcher = FileSearcher::new("test_file.txt".to_string(), dir.path().to_str().unwrap().to_string());
+        let searcher = FileSearcher::new(
+            "test_file.txt".to_string(),
+            dir.path().to_str().unwrap().to_string(),
+        );
         searcher.search(dir.path().to_str().unwrap(), false);
 
         let results = searcher.results.lock().unwrap();
@@ -154,7 +162,10 @@ mod file_searcher_tests {
         let file_path = dir.path().join("test_file.txt");
         File::create(&file_path).unwrap();
 
-        let searcher = FileSearcher::new("nonexistent".to_string(), dir.path().to_str().unwrap().to_string());
+        let searcher = FileSearcher::new(
+            "nonexistent".to_string(),
+            dir.path().to_str().unwrap().to_string(),
+        );
         searcher.search(dir.path().to_str().unwrap(), false);
 
         let results = searcher.results.lock().unwrap();
@@ -163,7 +174,8 @@ mod file_searcher_tests {
 
     #[test]
     fn handles_nonexistent_directory_gracefully() {
-        let searcher = FileSearcher::new("anything".to_string(), "nonexistent_directory".to_string());
+        let searcher =
+            FileSearcher::new("anything".to_string(), "nonexistent_directory".to_string());
         searcher.search("nonexistent_directory", false);
 
         let results = searcher.results.lock().unwrap();
@@ -177,7 +189,10 @@ mod file_searcher_tests {
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "Verbose mode test.").unwrap();
 
-        let searcher = FileSearcher::new("verbose_test_file.txt".to_string(), dir.path().to_str().unwrap().to_string());
+        let searcher = FileSearcher::new(
+            "verbose_test_file.txt".to_string(),
+            dir.path().to_str().unwrap().to_string(),
+        );
         searcher.search(dir.path().to_str().unwrap(), true);
     }
 }
