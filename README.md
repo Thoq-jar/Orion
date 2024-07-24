@@ -17,6 +17,8 @@ or if you prefer a 1-liner:
 chmod +x orion && ./orion
 ```
 
+# License
+
 [Thoq-License](https://raw.githubusercontent.com/Thoq-jar/Thoq-License/main/License)
 
 # Instalaltion
