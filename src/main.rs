@@ -1,7 +1,7 @@
-use std::env;
-use std::io::{self, Write};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::*;
+use std::io::*;
+use std::sync::*;
+use std::time::*;
 
 #[derive(Debug)]
 struct SearchResult {
@@ -110,15 +110,15 @@ fn main() {
     }
     println!("[Orion] Welcome to Orion, the file search engine.");
     print!("[Orion] Enter search scope: ");
-    io::stdout().flush().unwrap();
+    stdout().flush().unwrap();
     let mut root_dir = String::new();
-    io::stdin().read_line(&mut root_dir).unwrap();
+    stdin().read_line(&mut root_dir).unwrap();
     let root_dir = root_dir.trim().to_string();
 
     print!("[Orion] Enter search query: ");
-    io::stdout().flush().unwrap();
+    stdout().flush().unwrap();
     let mut query = String::new();
-    io::stdin().read_line(&mut query).unwrap();
+    stdin().read_line(&mut query).unwrap();
     let query = query.trim().to_string();
 
     let file_searcher = FileSearcher::new(query.to_string(), root_dir.clone());
@@ -126,7 +126,6 @@ fn main() {
     file_searcher.display_results();
 }
 
-// Tests
 #[cfg(test)]
 mod file_searcher_tests {
     use std::fs::File;
