@@ -1,3 +1,4 @@
+use std::env;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -24,7 +25,7 @@ impl FileSearcher {
         }
     }
 
-    fn search(&self, root_dir: &str) {
+    fn search(&self, root_dir: &str, verbose: bool) {
         println!("\n[Orion] Searching for files...");
 
         let results = Arc::clone(&self.results);
@@ -36,11 +37,20 @@ impl FileSearcher {
                 Ok(entry) => {
                     if entry.file_type().is_file() {
                         let filename = entry.file_name().to_string_lossy().to_string();
+                        if verbose {
+                            println!(
+                                "[VM] Orion Currently processing: {}",
+                                entry.path().display()
+                            );
+                        }
                         if filename.contains(&query) {
                             let mut results = results.lock().unwrap();
                             results.push(SearchResult {
                                 path: entry.path().display().to_string(),
                             });
+                            if verbose {
+                                println!("[Orion] Found match: {}", entry.path().display());
+                            }
                         }
                     }
                 }
@@ -57,7 +67,7 @@ impl FileSearcher {
         if results.is_empty() {
             println!("[Orion] No files found matching the query.");
         } else {
-            println!("Done!");
+            println!("[Orion] Done!");
             println!(
                 "[Orion] Found {} file(s) matching the query in {}:",
                 results.len(),
@@ -85,9 +95,15 @@ fn main() {
 ╚██████╔╝██║  ██║██║╚██████╔╝██║ ╚████║
  ╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
 "#;
-    println!("{}", banner);
-    println!("[Orion] Welcome to Orion, the file search engine.");
+    let args: Vec<String> = env::args().collect();
+    let mut verbose = false;
 
+    println!("{}", banner);
+    if args.contains(&"--verbose".to_string()) {
+        verbose = true;
+        println!("[Debug] Orion running in Verbose mode!");
+    }
+    println!("[Orion] Welcome to Orion, the file search engine.");
     print!("[Orion] Enter search scope: ");
     io::stdout().flush().unwrap();
     let mut root_dir = String::new();
@@ -101,6 +117,6 @@ fn main() {
     let query = query.trim().to_string();
 
     let file_searcher = FileSearcher::new(query.to_string(), root_dir.clone());
-    file_searcher.search(&root_dir);
+    file_searcher.search(&root_dir, verbose);
     file_searcher.display_results();
 }
