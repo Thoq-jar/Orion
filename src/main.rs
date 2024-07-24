@@ -55,7 +55,7 @@ impl FileSearcher {
 
             if entry.file_type().is_file() && entry.file_name().to_string_lossy().contains(&query) {
                 let path_display = entry.path().display().to_string();
-                let mut results = results.lock().unwrap();o
+                let mut results = results.lock().unwrap();
                 results.push(SearchResult {
                     path: path_display.clone(),
                 });
