@@ -98,10 +98,15 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut verbose = false;
 
-    println!("{}", banner);
     if args.contains(&"--verbose".to_string()) {
         verbose = true;
+        println!("{}", banner);
         println!("[Debug] Orion running in Verbose mode!");
+    } else if args.contains(&"--help".to_string()) {
+        println!("[Orion] Usage: orion [--verbose] (is the only option available)");
+        return;
+    } else {
+        println!("{}", banner);
     }
     println!("[Orion] Welcome to Orion, the file search engine.");
     print!("[Orion] Enter search scope: ");
