@@ -6,6 +6,7 @@ const time = std.time;
 const Mutex = std.Thread.Mutex;
 const ArrayList = std.ArrayList;
 const path = std.fs.path;
+const stdout = std.io.getStdOut().writer();
 
 const SearchResult = struct {
     path: []const u8,
@@ -38,7 +39,7 @@ pub const FileSearcher = struct {
     }
 
     pub fn search(self: *FileSearcher, verbose: bool) !void {
-        std.debug.print("\n[Orion] Searching for files...\n", .{});
+        try stdout.print("\n[Orion] Searching for files...\n", .{});
         try self.searchDir(self.root_dir, verbose);
     }
 
@@ -46,7 +47,7 @@ pub const FileSearcher = struct {
         var dir = fs.openDirAbsolute(dir_path, .{ .iterate = true }) catch |err| {
             if (err == error.AccessDenied) {
                 if (verbose) {
-                    std.debug.print("[Orion] Access denied: {s}\n", .{dir_path});
+                    try stdout.print("[Orion] Access denied: {s}\n", .{dir_path});
                 }
                 return;
             }
@@ -60,7 +61,7 @@ pub const FileSearcher = struct {
             defer self.allocator.free(full_path);
 
             if (verbose) {
-                std.debug.print("[VM] Orion Currently processing: {s}\n", .{full_path});
+                try stdout.print("[VM] Orion Currently processing: {s}\n", .{full_path});
             }
 
             switch (entry.kind) {
@@ -70,7 +71,7 @@ pub const FileSearcher = struct {
                         defer self.mutex.unlock();
                         try self.results.append(SearchResult{ .path = try self.allocator.dupe(u8, full_path) });
                         if (verbose) {
-                            std.debug.print("[Orion] Found match: {s}\n", .{full_path});
+                            try stdout.print("[Orion] Found match: {s}\n", .{full_path});
                         }
                     }
                 },
@@ -79,7 +80,7 @@ pub const FileSearcher = struct {
                         return err;
                     }
                     if (verbose) {
-                        std.debug.print("[Orion] Access denied: {s}\n", .{full_path});
+                        try stdout.print("[Orion] Access denied: {s}\n", .{full_path});
                     }
                 },
                 else => {},
@@ -87,22 +88,22 @@ pub const FileSearcher = struct {
         }
     }
 
-    pub fn displayResults(self: *FileSearcher) void {
+    pub fn displayResults(self: *FileSearcher) !void {
         self.mutex.lock();
         defer self.mutex.unlock();
 
         if (self.results.items.len == 0) {
-            std.debug.print("[Orion] No files found matching the query.\n", .{});
+            try stdout.print("[Orion] No files found matching the query.\n", .{});
         } else {
-            std.debug.print("[Orion] Done!\n", .{});
-            std.debug.print("[Orion] Found {} file(s) matching the query in {s}:\n", .{ self.results.items.len, self.root_dir });
+            try stdout.print("[Orion] Done!\n", .{});
+            try stdout.print("[Orion] Found {} file(s) matching the query in {s}:\n", .{ self.results.items.len, self.root_dir });
             for (self.results.items) |result| {
-                std.debug.print("Orion found: {s}\n", .{result.path});
+                try stdout.print("Orion found: {s}\n", .{result.path});
             }
-            std.debug.print("[Orion] Search completed.\n", .{});
+            try stdout.print("[Orion] Search completed.\n", .{});
 
             const elapsed_time = time.milliTimestamp() - self.start_time;
-            std.debug.print("[Orion] Elapsed time: {}ms\n", .{elapsed_time});
+            try stdout.print("[Orion] Elapsed time: {}ms\n", .{elapsed_time});
         }
     }
 };

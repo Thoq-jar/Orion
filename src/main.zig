@@ -1,6 +1,8 @@
 const std = @import("std");
 const FileSearcher = @import("search.zig").FileSearcher;
 const utils = @import("utils.zig");
+const io = std.io;
+const stdout = io.getStdOut().writer();
 
 pub fn main() !void {
     const banner =
@@ -24,21 +26,21 @@ pub fn main() !void {
 
     if (utils.contains(args[1..], "--verbose")) {
         verbose = true;
-        std.debug.print("{s}", .{banner});
-        std.debug.print("[Debug] Orion running in Verbose mode!\n", .{});
+        try stdout.print("{s}", .{banner});
+        try stdout.print("[Debug] Orion running in Verbose mode!\n", .{});
     } else if (utils.contains(args[1..], "--help")) {
-        std.debug.print("[Orion] Usage: orion [--verbose] (is the only option available)\n", .{});
+        try stdout.print("[Orion] Usage: orion [--verbose] (is the only option available)\n", .{});
         return;
     } else {
-        std.debug.print("{s}", .{banner});
+        try stdout.print("{s}", .{banner});
     }
 
-    std.debug.print("[Orion] Welcome to Orion, the file search engine.\n", .{});
-    std.debug.print("[Orion] Enter search scope: ", .{});
+    try stdout.print("[Orion] Welcome to Orion, the file search engine.\n", .{});
+    try stdout.print("[Orion] Enter search scope: ", .{});
     const root_dir = try utils.readLine(allocator);
     defer allocator.free(root_dir);
 
-    std.debug.print("[Orion] Enter search query: ", .{});
+    try stdout.print("[Orion] Enter search query: ", .{});
     const query = try utils.readLine(allocator);
     defer allocator.free(query);
 
@@ -46,5 +48,5 @@ pub fn main() !void {
     defer file_searcher.deinit();
 
     try file_searcher.search(verbose);
-    file_searcher.displayResults();
+    try file_searcher.displayResults();
 }
