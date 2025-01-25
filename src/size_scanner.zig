@@ -58,7 +58,10 @@ pub const SizeScanner = struct {
 
     fn scanDir(self: *SizeScanner, dir_path: []const u8, verbose: bool) !void {
         var dir = fs.openDirAbsolute(dir_path, .{ .iterate = true }) catch |err| {
-            utils.print("[Orion] Access denied: {s}\n", .{dir_path});
+            if (err == error.AccessDenied) {
+                utils.print("[Orion] Access denied to file {s}, skipping...\n", .{dir_path});
+                return;
+            }
             return err;
         };
         defer dir.close();
@@ -75,13 +78,19 @@ pub const SizeScanner = struct {
             switch (entry.kind) {
                 .file => {
                     const file = fs.openFileAbsolute(full_path, .{}) catch |err| {
-                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
+                        if (err == error.AccessDenied) {
+                            utils.print("[Orion] Access denied to file {s}, skipping...\n", .{full_path});
+                            continue;
+                        }
                         return err;
                     };
                     defer file.close();
 
                     const stat = file.stat() catch |err| {
-                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
+                        if (err == error.AccessDenied) {
+                            utils.print("[Orion] Access denied to file {s}, skipping...\n", .{full_path});
+                            continue;
+                        }
                         return err;
                     };
 
@@ -93,12 +102,13 @@ pub const SizeScanner = struct {
                     });
                 },
                 .directory => self.scanDir(full_path, verbose) catch |err| {
-                    if (err != error.AccessDenied) {
-                        return err;
+                    if (err == error.AccessDenied) {
+                        if (verbose) {
+                            utils.print("[Orion] Access denied to directory {s}, skipping...\n", .{full_path});
+                        }
+                        continue;
                     }
-                    if (verbose) {
-                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
-                    }
+                    return err;
                 },
                 else => {},
             }

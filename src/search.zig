@@ -47,7 +47,7 @@ pub const FileSearcher = struct {
         var dir = fs.openDirAbsolute(dir_path, .{ .iterate = true }) catch |err| {
             if (err == error.AccessDenied) {
                 if (verbose) {
-                    utils.print("[Orion] Access denied: {s}\n", .{dir_path});
+                    utils.print("[Orion] Access denied to file {s}, skipping...\n", .{dir_path});
                 }
                 return;
             }
@@ -76,12 +76,13 @@ pub const FileSearcher = struct {
                     }
                 },
                 .directory => self.searchDir(full_path, verbose) catch |err| {
-                    if (err != error.AccessDenied) {
-                        return err;
+                    if (err == error.AccessDenied) {
+                        if (verbose) {
+                            utils.print("[Orion] Access denied to directory {s}, skipping...\n", .{full_path});
+                        }
+                        continue;
                     }
-                    if (verbose) {
-                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
-                    }
+                    return err;
                 },
                 else => {},
             }
