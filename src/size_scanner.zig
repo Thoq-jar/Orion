@@ -1,9 +1,9 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 const fs = std.fs;
 const mem = std.mem;
 const Mutex = std.Thread.Mutex;
 const ArrayList = std.ArrayList;
-const stdout = std.io.getStdOut().writer();
 const ThreadPool = @import("thread_pool.zig").ThreadPool;
 
 const FileInfo = struct {
@@ -51,19 +51,14 @@ pub const SizeScanner = struct {
     }
 
     pub fn scan(self: *SizeScanner, verbose: bool) !void {
-        try stdout.print("\n[Orion] Scanning directory for large files...\n", .{});
+        utils.print("\n[Orion] Scanning directory for large files...\n", .{});
         try self.scanDir(self.root_dir, verbose);
         try self.sortResults();
     }
 
     fn scanDir(self: *SizeScanner, dir_path: []const u8, verbose: bool) !void {
         var dir = fs.openDirAbsolute(dir_path, .{ .iterate = true }) catch |err| {
-            if (err == error.AccessDenied) {
-                if (verbose) {
-                    try stdout.print("[Orion] Access denied: {s}\n", .{dir_path});
-                }
-                return;
-            }
+            utils.print("[Orion] Access denied: {s}\n", .{dir_path});
             return err;
         };
         defer dir.close();
@@ -74,29 +69,19 @@ pub const SizeScanner = struct {
             defer self.allocator.free(full_path);
 
             if (verbose) {
-                try stdout.print("[VM] Orion Currently scanning: {s}\n", .{full_path});
+                utils.print("[VM] Orion Currently scanning: {s}\n", .{full_path});
             }
 
             switch (entry.kind) {
                 .file => {
                     const file = fs.openFileAbsolute(full_path, .{}) catch |err| {
-                        if (err == error.AccessDenied) {
-                            if (verbose) {
-                                try stdout.print("[Orion] Access denied: {s}\n", .{full_path});
-                            }
-                            continue;
-                        }
+                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
                         return err;
                     };
                     defer file.close();
 
                     const stat = file.stat() catch |err| {
-                        if (err == error.AccessDenied) {
-                            if (verbose) {
-                                try stdout.print("[Orion] Access denied: {s}\n", .{full_path});
-                            }
-                            continue;
-                        }
+                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
                         return err;
                     };
 
@@ -112,7 +97,7 @@ pub const SizeScanner = struct {
                         return err;
                     }
                     if (verbose) {
-                        try stdout.print("[Orion] Access denied: {s}\n", .{full_path});
+                        utils.print("[Orion] Access denied: {s}\n", .{full_path});
                     }
                 },
                 else => {},
@@ -151,16 +136,14 @@ pub const SizeScanner = struct {
         defer self.mutex.unlock();
 
         if (self.results.items.len == 0) {
-            try stdout.print("[Orion] No files found.\n", .{});
-            return;
-        }
-
-        try stdout.print("[Orion] Found {} files. Largest files:\n", .{self.results.items.len});
-
-        const display_count = @min(100, self.results.items.len);
-        for (self.results.items[0..display_count]) |result| {
-            const formatted = formatSize(result.size);
-            try stdout.print("[Orion] {d:.2}{s}: {s}\n", .{ formatted.value, formatted.unit, result.path });
+            utils.print("[Orion] No files found.\n", .{});
+        } else {
+            utils.print("[Orion] Found {} files. Largest files:\n", .{self.results.items.len});
+            const display_count = @min(100, self.results.items.len);
+            for (self.results.items[0..display_count]) |result| {
+                const formatted = formatSize(result.size);
+                utils.print("[Orion] {d:.2}{s}: {s}\n", .{ formatted.value, formatted.unit, result.path });
+            }
         }
     }
 };

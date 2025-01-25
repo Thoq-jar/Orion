@@ -3,19 +3,10 @@ const FileSearcher = @import("search.zig").FileSearcher;
 const SizeScanner = @import("size_scanner.zig").SizeScanner;
 const utils = @import("utils.zig");
 const io = std.io;
-const stdout = io.getStdOut().writer();
+
+const banner = @embedFile("assets/ascii_logo.txt");
 
 pub fn main() !void {
-    const banner =
-        \\  ██████╗ ██████╗ ██╗ ██████╗ ███╗   ██╗
-        \\ ██╔═══██╗██╔══██╗██║██╔═══██╗████╗  ██║
-        \\ ██║   ██║██████╔╝██║██║   ██║██╔██╗ ██║
-        \\ ██║   ██║██╔══██╗██║██║   ██║██║╚██╗██║
-        \\ ╚██████╔╝██║  ██║██║╚██████╔╝██║ ╚████║
-        \\  ╚═════╝ ╚═╝  ╚═╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
-        \\
-    ;
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -34,56 +25,61 @@ pub fn main() !void {
         } else if (std.mem.startsWith(u8, arg, "--threads=")) {
             if (std.mem.indexOf(u8, arg, "=")) |index| {
                 const thread_str = arg[index + 1 ..];
-                thread_count = try std.fmt.parseInt(u32, thread_str, 10);
+                if (std.fmt.parseInt(u8, thread_str, 10)) |num| {
+                    thread_count = num;
+                } else |_| {
+                    utils.print("[Orion] Error: Invalid thread count format\n", .{});
+                    return;
+                }
             } else {
-                try stdout.print("[Orion] Error: Invalid thread count format\n", .{});
+                utils.print("[Orion] Error: Invalid thread count format\n", .{});
                 return;
             }
         } else if (std.mem.eql(u8, arg, "--threads")) {
             i += 1;
             if (i >= args.len) {
-                try stdout.print("[Orion] Error: --threads requires a number\n", .{});
+                utils.print("[Orion] Error: --threads requires a number\n", .{});
                 return;
             }
             thread_count = try std.fmt.parseInt(u32, args[i], 10);
         } else if (std.mem.eql(u8, arg, "--help")) {
-            try stdout.print("[Orion] Usage: orion [--verbose] [--threads=N]\n", .{});
-            try stdout.print("  --verbose: Enable verbose output\n", .{});
-            try stdout.print("  --threads N: Number of threads to use (default: 1)\n", .{});
-            try stdout.print("  --threads=N: Alternative syntax for thread count\n", .{});
+            utils.print("[Orion] Usage: orion [--verbose] [--threads=N]\n", .{});
+            utils.print("  --verbose: Enable verbose output\n", .{});
+            utils.print("  --threads N: Number of threads to use (default: 1)\n", .{});
+            utils.print("  --threads=N: Alternative syntax for thread count\n", .{});
             return;
         }
     }
 
     if (verbose) {
-        try stdout.print("{s}", .{banner});
-        try stdout.print("[VM] Orion running in Verbose mode!\n", .{});
-        try stdout.print("[VM] Using {} thread(s)\n", .{thread_count});
+        utils.print("{s}\n", .{banner});
+        utils.print("[VM] Orion running in Verbose mode!\n", .{});
+        utils.print("[VM] Using {} thread(s)\n", .{thread_count});
     } else if (utils.contains(args[1..], "--help")) {
-        try stdout.print("[Orion] Usage: orion [--verbose] [--threads=N]\n", .{});
-        try stdout.print("  --verbose: Enable verbose output\n", .{});
-        try stdout.print("  --threads N: Number of threads to use (default: 1)\n", .{});
-        try stdout.print("  --threads=N: Alternative syntax for thread count\n", .{});
+        utils.print("[Orion] Usage: orion [--verbose] [--threads=N]\n", .{});
+        utils.print("  --verbose: Enable verbose output\n", .{});
+        utils.print("  --threads N: Number of threads to use (default: 1)\n", .{});
+        utils.print("  --threads=N: Alternative syntax for thread count\n", .{});
         return;
     } else {
-        try stdout.print("{s}", .{banner});
+        utils.print("{s}", .{banner});
     }
 
-    try stdout.print("[Orion] Welcome to Orion, the file search engine.\n", .{});
-    try stdout.print("\nSelect operation:\n", .{});
-    try stdout.print("1. Search for files by name\n", .{});
-    try stdout.print("2. Find large files\n", .{});
-    try stdout.print("Choice (1/2): ", .{});
+    utils.print("[Orion] Welcome to Orion, the file search engine.\n", .{});
+    utils.print("\nSelect operation:\n", .{});
+    utils.print("1. Search for files by name\n", .{});
+    utils.print("2. Find large files\n", .{});
+    utils.print("Choice (1/2): ", .{});
 
     const choice = try utils.readLine(allocator);
     defer allocator.free(choice);
 
-    try stdout.print("[Orion] Enter search scope: ", .{});
+    utils.print("[Orion] Enter search scope: ", .{});
     const root_dir = try utils.readLine(allocator);
     defer allocator.free(root_dir);
 
     if (std.mem.eql(u8, choice, "1")) {
-        try stdout.print("[Orion] Enter search query: ", .{});
+        utils.print("[Orion] Enter search query: ", .{});
         const query = try utils.readLine(allocator);
         defer allocator.free(query);
 
@@ -99,7 +95,6 @@ pub fn main() !void {
         try size_scanner.scan(verbose);
         try size_scanner.displayResults();
     } else {
-        try stdout.print("[Orion] Invalid choice. Please select 1 or 2.\n", .{});
-        return;
+        utils.print("[Orion] Invalid choice. Please select 1 or 2.\n", .{});
     }
 }
