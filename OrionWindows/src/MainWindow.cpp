@@ -329,32 +329,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
                         CheckMenuItem(hViewMenu, IDM_VIEW_DARKMODE, MF_BYCOMMAND | (isDarkMode ? MF_CHECKED : MF_UNCHECKED));
 
-                        BOOL value = isDarkMode ? TRUE : FALSE;
-                        DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-
                         if (isDarkMode) {
-                            SetWindowTheme(m_searchQueryEdit, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_extensionEdit, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_pathEdit, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_resultsList, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_searchButton, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_cancelButton, L"DarkMode_Explorer", nullptr);
-                            SetWindowTheme(m_browseButton, L"DarkMode_Explorer", nullptr);
                             SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
                             SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(50, 50, 50));
                         } else {
-                            SetWindowTheme(m_searchQueryEdit, L"Explorer", nullptr);
-                            SetWindowTheme(m_extensionEdit, L"Explorer", nullptr);
-                            SetWindowTheme(m_pathEdit, L"Explorer", nullptr);
-                            SetWindowTheme(m_resultsList, L"Explorer", nullptr);
-                            SetWindowTheme(m_searchButton, L"Explorer", nullptr);
-                            SetWindowTheme(m_cancelButton, L"Explorer", nullptr);
-                            SetWindowTheme(m_browseButton, L"Explorer", nullptr);
                             SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
                             SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(200, 200, 200));
                         }
 
-                        InvalidateRect(m_hwnd, nullptr, TRUE);
+                        InvalidateRect(m_progressBar, nullptr, TRUE);
                     }
                     return 0;
             }
@@ -364,97 +347,26 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             if (lParam && wcscmp(reinterpret_cast<LPCWSTR>(lParam), L"ImmersiveColorSet") == 0) {
                 BOOL isDarkMode = FALSE;
                 HKEY hKey;
-                if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Orion\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
                     DWORD value = 0;
                     DWORD size = sizeof(value);
-                    if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+                    if (RegQueryValueEx(hKey, L"DarkMode", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
                         isDarkMode = value != 0;
                     }
                     RegCloseKey(hKey);
                 }
 
-                BOOL value = isDarkMode ? TRUE : FALSE;
-                DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-                
                 if (isDarkMode) {
-                    SetWindowTheme(m_searchQueryEdit, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_extensionEdit, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_pathEdit, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_resultsList, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_searchButton, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_cancelButton, L"DarkMode_Explorer", nullptr);
-                    SetWindowTheme(m_browseButton, L"DarkMode_Explorer", nullptr);
                     SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
                     SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(50, 50, 50));
                 } else {
-                    SetWindowTheme(m_searchQueryEdit, L"Explorer", nullptr);
-                    SetWindowTheme(m_extensionEdit, L"Explorer", nullptr);
-                    SetWindowTheme(m_pathEdit, L"Explorer", nullptr);
-                    SetWindowTheme(m_resultsList, L"Explorer", nullptr);
-                    SetWindowTheme(m_searchButton, L"Explorer", nullptr);
-                    SetWindowTheme(m_cancelButton, L"Explorer", nullptr);
-                    SetWindowTheme(m_browseButton, L"Explorer", nullptr);
                     SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
                     SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(200, 200, 200));
                 }
 
-                InvalidateRect(m_hwnd, nullptr, TRUE);
+                InvalidateRect(m_progressBar, nullptr, TRUE);
             }
             break;
-        }
-
-        case WM_CTLCOLOREDIT:
-        case WM_CTLCOLORLISTBOX:
-        case WM_CTLCOLORBTN:
-        case WM_CTLCOLORSTATIC:
-        case WM_CTLCOLORDLG: {
-            HDC hdc = (HDC)wParam;
-            HWND hwnd = (HWND)lParam;
-
-            BOOL isDarkMode = FALSE;
-            HKEY hKey;
-            if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-                DWORD value = 0;
-                DWORD size = sizeof(value);
-                if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
-                    isDarkMode = value != 0;
-                }
-                RegCloseKey(hKey);
-            }
-
-            if (isDarkMode) {
-                SetTextColor(hdc, RGB(255, 255, 255));
-                SetBkColor(hdc, RGB(32, 32, 32));
-                static HBRUSH darkBrush = CreateSolidBrush(RGB(32, 32, 32));
-                return (LRESULT)darkBrush;
-            } else {
-                SetTextColor(hdc, RGB(0, 0, 0));
-                SetBkColor(hdc, RGB(255, 255, 255));
-                return (LRESULT)GetStockObject(WHITE_BRUSH);
-            }
-        }
-
-        case WM_ERASEBKGND: {
-            HDC hdc = (HDC)wParam;
-            RECT rect;
-            GetClientRect(m_hwnd, &rect);
-
-            BOOL isDarkMode = FALSE;
-            HKEY hKey;
-            if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-                DWORD value = 0;
-                DWORD size = sizeof(value);
-                if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
-                    isDarkMode = value != 0;
-                }
-                RegCloseKey(hKey);
-            }
-
-            COLORREF bgColor = isDarkMode ? RGB(32, 32, 32) : RGB(255, 255, 255);
-            HBRUSH hBrush = CreateSolidBrush(bgColor);
-            FillRect(hdc, &rect, hBrush);
-            DeleteObject(hBrush);
-            return TRUE;
         }
 
         case WM_DESTROY:
