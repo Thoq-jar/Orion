@@ -79,7 +79,7 @@ bool MainWindow::Create() {
     m_hwnd = CreateWindowEx(
         0,
         wc.lpszClassName,
-        L"Orion File Search",
+        L"Orion",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         windowRect.right - windowRect.left,
@@ -123,10 +123,10 @@ void MainWindow::CreateControls() {
     int buttonWidth = static_cast<int>(90 * dpiScale);
 
     DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT;
-    DWORD editStyle = WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
+    DWORD editStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL;
 
     m_searchQueryEdit = CreateWindowEx(
-        0, L"EDIT", L"",
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
         editStyle,
         margin, margin, 
         static_cast<int>(300 * dpiScale), controlHeight,
@@ -135,7 +135,7 @@ void MainWindow::CreateControls() {
     );
 
     m_extensionEdit = CreateWindowEx(
-        0, L"EDIT", L"",
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
         editStyle,
         margin + static_cast<int>(310 * dpiScale), margin,
         static_cast<int>(100 * dpiScale), controlHeight,
@@ -144,7 +144,7 @@ void MainWindow::CreateControls() {
     );
 
     m_pathEdit = CreateWindowEx(
-        0, L"EDIT", L"",
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
         editStyle,
         margin, margin + controlHeight + 10,
         static_cast<int>(500 * dpiScale), controlHeight,
@@ -182,7 +182,7 @@ void MainWindow::CreateControls() {
 
     m_progressBar = CreateWindowEx(
         0, PROGRESS_CLASS, nullptr,
-        WS_CHILD | WS_VISIBLE,
+        WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
         margin, margin + 2 * controlHeight + 20,
         static_cast<int>(700 * dpiScale), static_cast<int>(8 * dpiScale),
         m_hwnd, (HMENU)IDC_PROGRESS,
@@ -190,9 +190,11 @@ void MainWindow::CreateControls() {
     );
     SendMessage(m_progressBar, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
     SendMessage(m_progressBar, PBM_SETSTEP, 1, 0);
+    SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
+    SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(200, 200, 200));
 
     m_resultsList = CreateWindowEx(
-        0, L"LISTBOX", nullptr,
+        WS_EX_CLIENTEDGE, L"LISTBOX", nullptr,
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
         margin, margin + 2 * controlHeight + 35,
         static_cast<int>(700 * dpiScale), static_cast<int>(460 * dpiScale),
@@ -229,7 +231,6 @@ void MainWindow::CreateControls() {
     GetCurrentDirectory(MAX_PATH, currentPath);
     SetWindowText(m_pathEdit, currentPath);
 
-    // Set initial dark mode state
     BOOL isDarkMode = FALSE;
     HKEY hKey;
     if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
@@ -292,7 +293,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             }
             break;
 
-        case WM_SETTINGCHANGE:
+        case WM_SETTINGCHANGE: {
             if (lParam && wcscmp(reinterpret_cast<LPCWSTR>(lParam), L"ImmersiveColorSet") == 0) {
                 BOOL isDarkMode = FALSE;
                 HKEY hKey;
@@ -304,18 +305,36 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
                     }
                     RegCloseKey(hKey);
                 }
+
+                BOOL value = isDarkMode ? TRUE : FALSE;
+                DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+                
                 if (isDarkMode) {
-                    BOOL value = TRUE;
-                    DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-                    SetWindowTheme(m_hwnd, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_searchQueryEdit, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_extensionEdit, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_pathEdit, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_resultsList, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_searchButton, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_cancelButton, L"DarkMode_Explorer", nullptr);
+                    SetWindowTheme(m_browseButton, L"DarkMode_Explorer", nullptr);
+                    SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
+                    SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(50, 50, 50));
                 } else {
-                    BOOL value = FALSE;
-                    DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-                    SetWindowTheme(m_hwnd, L"Explorer", nullptr);
+                    SetWindowTheme(m_searchQueryEdit, L"Explorer", nullptr);
+                    SetWindowTheme(m_extensionEdit, L"Explorer", nullptr);
+                    SetWindowTheme(m_pathEdit, L"Explorer", nullptr);
+                    SetWindowTheme(m_resultsList, L"Explorer", nullptr);
+                    SetWindowTheme(m_searchButton, L"Explorer", nullptr);
+                    SetWindowTheme(m_cancelButton, L"Explorer", nullptr);
+                    SetWindowTheme(m_browseButton, L"Explorer", nullptr);
+                    SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
+                    SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(200, 200, 200));
                 }
+
                 InvalidateRect(m_hwnd, nullptr, TRUE);
             }
             break;
+        }
 
         case WM_CTLCOLOREDIT:
         case WM_CTLCOLORLISTBOX:
