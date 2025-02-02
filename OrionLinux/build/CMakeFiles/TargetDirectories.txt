@@ -1,0 +1,4 @@
+/Users/tristanshaw/Documents/orion/OrionLinux/build/CMakeFiles/Orion.dir
+/Users/tristanshaw/Documents/orion/OrionLinux/build/CMakeFiles/OrionKitBuild.dir
+/Users/tristanshaw/Documents/orion/OrionLinux/build/CMakeFiles/edit_cache.dir
+/Users/tristanshaw/Documents/orion/OrionLinux/build/CMakeFiles/rebuild_cache.dir
