@@ -56,7 +56,7 @@ bool MainWindow::Create() {
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = GetModuleHandle(nullptr);
     wc.lpszClassName = L"OrionMainWindow";
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hbrBackground = nullptr;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
@@ -79,7 +79,7 @@ bool MainWindow::Create() {
     m_hwnd = CreateWindowEx(
         0,
         wc.lpszClassName,
-        L"Orion File Search - Windows",
+        L"Orion File Search",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         windowRect.right - windowRect.left,
@@ -105,12 +105,9 @@ bool MainWindow::Create() {
         RegCloseKey(hKey);
     }
 
-    if (isDarkMode) {
-        BOOL value = TRUE;
-        DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-        SetWindowTheme(m_hwnd, L"DarkMode_Explorer", nullptr);
-    }
-
+    BOOL value = isDarkMode ? TRUE : FALSE;
+    DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+    
     CreateControls();
     return true;
 }
@@ -122,12 +119,15 @@ void MainWindow::CreateControls() {
     float dpiScale = dpiX / 96.0f;
 
     int margin = static_cast<int>(10 * dpiScale);
-    int controlHeight = static_cast<int>(25 * dpiScale);
-    int buttonWidth = static_cast<int>(80 * dpiScale);
+    int controlHeight = static_cast<int>(32 * dpiScale);
+    int buttonWidth = static_cast<int>(90 * dpiScale);
+
+    DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT;
+    DWORD editStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL;
 
     m_searchQueryEdit = CreateWindowEx(
-        0, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        editStyle,
         margin, margin, 
         static_cast<int>(300 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_SEARCH_QUERY,
@@ -135,8 +135,8 @@ void MainWindow::CreateControls() {
     );
 
     m_extensionEdit = CreateWindowEx(
-        0, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        editStyle,
         margin + static_cast<int>(310 * dpiScale), margin,
         static_cast<int>(100 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_EXTENSION,
@@ -145,7 +145,7 @@ void MainWindow::CreateControls() {
 
     m_searchButton = CreateWindow(
         L"BUTTON", L"Search",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        buttonStyle,
         margin + static_cast<int>(420 * dpiScale), margin,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_SEARCH_BUTTON,
@@ -154,8 +154,8 @@ void MainWindow::CreateControls() {
 
     m_cancelButton = CreateWindow(
         L"BUTTON", L"Cancel",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        margin + static_cast<int>(510 * dpiScale), margin,
+        buttonStyle,
+        margin + static_cast<int>(520 * dpiScale), margin,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_CANCEL_BUTTON,
         GetModuleHandle(nullptr), nullptr
@@ -163,8 +163,8 @@ void MainWindow::CreateControls() {
     EnableWindow(m_cancelButton, FALSE);
 
     m_pathEdit = CreateWindowEx(
-        0, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        editStyle,
         margin, margin + controlHeight + 10,
         static_cast<int>(500 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_PATH,
@@ -173,8 +173,8 @@ void MainWindow::CreateControls() {
 
     m_browseButton = CreateWindow(
         L"BUTTON", L"Browse",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        margin + static_cast<int>(510 * dpiScale), margin + controlHeight + 10,
+        buttonStyle,
+        margin + static_cast<int>(520 * dpiScale), margin + controlHeight + 10,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_BROWSE_BUTTON,
         GetModuleHandle(nullptr), nullptr
@@ -184,17 +184,18 @@ void MainWindow::CreateControls() {
         0, PROGRESS_CLASS, nullptr,
         WS_CHILD | WS_VISIBLE,
         margin, margin + 2 * controlHeight + 20,
-        static_cast<int>(680 * dpiScale), controlHeight,
+        static_cast<int>(700 * dpiScale), static_cast<int>(4 * dpiScale),
         m_hwnd, (HMENU)IDC_PROGRESS,
         GetModuleHandle(nullptr), nullptr
     );
     SendMessage(m_progressBar, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+    SendMessage(m_progressBar, PBM_SETSTEP, 1, 0);
 
     m_resultsList = CreateWindowEx(
-        0, L"LISTBOX", nullptr,
+        WS_EX_CLIENTEDGE, L"LISTBOX", nullptr,
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | WS_BORDER,
-        margin, margin + 3 * controlHeight + 30,
-        static_cast<int>(680 * dpiScale), static_cast<int>(440 * dpiScale),
+        margin, margin + 2 * controlHeight + 35,
+        static_cast<int>(700 * dpiScale), static_cast<int>(460 * dpiScale),
         m_hwnd, (HMENU)IDC_RESULTS,
         GetModuleHandle(nullptr), nullptr
     );
@@ -202,8 +203,8 @@ void MainWindow::CreateControls() {
     m_errorText = CreateWindowEx(
         0, L"STATIC", nullptr,
         WS_CHILD | SS_LEFT,
-        margin, margin + 3 * controlHeight + static_cast<int>(480 * dpiScale),
-        static_cast<int>(680 * dpiScale), controlHeight,
+        margin, margin + 2 * controlHeight + static_cast<int>(505 * dpiScale),
+        static_cast<int>(700 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_ERROR,
         GetModuleHandle(nullptr), nullptr
     );
@@ -294,23 +295,42 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             }
             break;
 
-        case WM_CTLCOLORSTATIC:
         case WM_CTLCOLOREDIT:
         case WM_CTLCOLORLISTBOX:
-        case WM_CTLCOLORBTN: {
+        case WM_CTLCOLORBTN:
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLORDLG: {
             HDC hdc = (HDC)wParam;
             HWND hwnd = (HWND)lParam;
-            
+
             BOOL isDarkMode = FALSE;
             DwmGetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
 
             if (isDarkMode) {
                 SetTextColor(hdc, RGB(255, 255, 255));
                 SetBkColor(hdc, RGB(32, 32, 32));
-                static HBRUSH hBrush = CreateSolidBrush(RGB(32, 32, 32));
-                return (LRESULT)hBrush;
+                static HBRUSH darkBrush = CreateSolidBrush(RGB(32, 32, 32));
+                return (LRESULT)darkBrush;
+            } else {
+                SetTextColor(hdc, RGB(0, 0, 0));
+                SetBkColor(hdc, RGB(255, 255, 255));
+                return (LRESULT)GetStockObject(WHITE_BRUSH);
             }
-            return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+        }
+
+        case WM_ERASEBKGND: {
+            HDC hdc = (HDC)wParam;
+            RECT rect;
+            GetClientRect(m_hwnd, &rect);
+
+            BOOL isDarkMode = FALSE;
+            DwmGetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
+
+            COLORREF bgColor = isDarkMode ? RGB(32, 32, 32) : RGB(255, 255, 255);
+            HBRUSH hBrush = CreateSolidBrush(bgColor);
+            FillRect(hdc, &rect, hBrush);
+            DeleteObject(hBrush);
+            return TRUE;
         }
 
         case WM_DESTROY:
@@ -359,8 +379,9 @@ void MainWindow::OnBrowseButtonClick() {
 
 void MainWindow::OnResultDoubleClick(int index) {
     if (index >= 0 && index < static_cast<int>(m_searchResults.size())) {
-        ShellExecute(nullptr, L"explore", m_searchResults[index].path.c_str(),
-                    nullptr, nullptr, SW_SHOW);
+        const std::wstring& path = m_searchResults[index].path;
+        std::wstring args = L"/select,\"" + path + L"\"";
+        ShellExecute(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOW);
     }
 }
 
