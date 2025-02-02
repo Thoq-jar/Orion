@@ -123,10 +123,10 @@ void MainWindow::CreateControls() {
     int buttonWidth = static_cast<int>(90 * dpiScale);
 
     DWORD buttonStyle = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | BS_FLAT;
-    DWORD editStyle = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL;
+    DWORD editStyle = WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
 
     m_searchQueryEdit = CreateWindowEx(
-        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        0, L"EDIT", L"",
         editStyle,
         margin, margin, 
         static_cast<int>(300 * dpiScale), controlHeight,
@@ -135,11 +135,20 @@ void MainWindow::CreateControls() {
     );
 
     m_extensionEdit = CreateWindowEx(
-        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        0, L"EDIT", L"",
         editStyle,
         margin + static_cast<int>(310 * dpiScale), margin,
         static_cast<int>(100 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_EXTENSION,
+        GetModuleHandle(nullptr), nullptr
+    );
+
+    m_pathEdit = CreateWindowEx(
+        0, L"EDIT", L"",
+        editStyle,
+        margin, margin + controlHeight + 10,
+        static_cast<int>(500 * dpiScale), controlHeight,
+        m_hwnd, (HMENU)IDC_PATH,
         GetModuleHandle(nullptr), nullptr
     );
 
@@ -162,15 +171,6 @@ void MainWindow::CreateControls() {
     );
     EnableWindow(m_cancelButton, FALSE);
 
-    m_pathEdit = CreateWindowEx(
-        WS_EX_CLIENTEDGE, L"EDIT", L"",
-        editStyle,
-        margin, margin + controlHeight + 10,
-        static_cast<int>(500 * dpiScale), controlHeight,
-        m_hwnd, (HMENU)IDC_PATH,
-        GetModuleHandle(nullptr), nullptr
-    );
-
     m_browseButton = CreateWindow(
         L"BUTTON", L"Browse",
         buttonStyle,
@@ -184,7 +184,7 @@ void MainWindow::CreateControls() {
         0, PROGRESS_CLASS, nullptr,
         WS_CHILD | WS_VISIBLE,
         margin, margin + 2 * controlHeight + 20,
-        static_cast<int>(700 * dpiScale), static_cast<int>(4 * dpiScale),
+        static_cast<int>(700 * dpiScale), static_cast<int>(8 * dpiScale),
         m_hwnd, (HMENU)IDC_PROGRESS,
         GetModuleHandle(nullptr), nullptr
     );
@@ -192,8 +192,8 @@ void MainWindow::CreateControls() {
     SendMessage(m_progressBar, PBM_SETSTEP, 1, 0);
 
     m_resultsList = CreateWindowEx(
-        WS_EX_CLIENTEDGE, L"LISTBOX", nullptr,
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | WS_BORDER,
+        0, L"LISTBOX", nullptr,
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
         margin, margin + 2 * controlHeight + 35,
         static_cast<int>(700 * dpiScale), static_cast<int>(460 * dpiScale),
         m_hwnd, (HMENU)IDC_RESULTS,
@@ -228,6 +228,28 @@ void MainWindow::CreateControls() {
     wchar_t currentPath[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, currentPath);
     SetWindowText(m_pathEdit, currentPath);
+
+    // Set initial dark mode state
+    BOOL isDarkMode = FALSE;
+    HKEY hKey;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD value = 0;
+        DWORD size = sizeof(value);
+        if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+            isDarkMode = value != 0;
+        }
+        RegCloseKey(hKey);
+    }
+
+    if (isDarkMode) {
+        SetWindowTheme(m_searchQueryEdit, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_extensionEdit, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_pathEdit, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_resultsList, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_searchButton, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_cancelButton, L"DarkMode_Explorer", nullptr);
+        SetWindowTheme(m_browseButton, L"DarkMode_Explorer", nullptr);
+    }
 }
 
 void MainWindow::SetupLayout() {}
@@ -304,7 +326,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             HWND hwnd = (HWND)lParam;
 
             BOOL isDarkMode = FALSE;
-            DwmGetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
+            HKEY hKey;
+            if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                DWORD value = 0;
+                DWORD size = sizeof(value);
+                if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+                    isDarkMode = value != 0;
+                }
+                RegCloseKey(hKey);
+            }
 
             if (isDarkMode) {
                 SetTextColor(hdc, RGB(255, 255, 255));
@@ -324,7 +354,15 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             GetClientRect(m_hwnd, &rect);
 
             BOOL isDarkMode = FALSE;
-            DwmGetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
+            HKEY hKey;
+            if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                DWORD value = 0;
+                DWORD size = sizeof(value);
+                if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+                    isDarkMode = value != 0;
+                }
+                RegCloseKey(hKey);
+            }
 
             COLORREF bgColor = isDarkMode ? RGB(32, 32, 32) : RGB(255, 255, 255);
             HBRUSH hBrush = CreateSolidBrush(bgColor);
