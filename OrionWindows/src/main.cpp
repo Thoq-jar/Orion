@@ -1,20 +1,26 @@
-#include <winrt/Microsoft.UI.Xaml.h>
-#include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
+#include <windows.h>
+#include <commctrl.h>
 #include "../include/MainWindow.hpp"
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
-    winrt::init_apartment(winrt::apartment_type::single_threaded);
-    
-    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
+    INITCOMMONCONTROLSEX icc;
+    icc.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icc.dwICC = ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icc);
+
     MainWindow window;
-    
-    MSG msg;
+    if (!window.Create()) {
+        return 1;
+    }
+
+    ShowWindow(window.GetHandle(), nCmdShow);
+    UpdateWindow(window.GetHandle());
+
+    MSG msg = {};
     while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    
-    CoUninitialize();
-    return 0;
-} 
+
+    return static_cast<int>(msg.wParam);
+}

@@ -4,17 +4,21 @@
 #include <shlwapi.h>
 #include <shellapi.h>
 
-using namespace winrt;
-using namespace Microsoft::UI::Xaml;
-using namespace Microsoft::UI::Xaml::Controls;
-using namespace Microsoft::UI::Xaml::Media;
-using namespace Windows::Foundation;
+#define IDC_SEARCH_QUERY 101
+#define IDC_EXTENSION 102
+#define IDC_PATH 103
+#define IDC_SEARCH_BUTTON 104
+#define IDC_CANCEL_BUTTON 105
+#define IDC_BROWSE_BUTTON 106
+#define IDC_PROGRESS 107
+#define IDC_RESULTS 108
+#define IDC_ERROR 109
 
 MainWindow::MainWindow() : 
+    m_hwnd(nullptr),
     m_shouldCancel(false),
     m_searchProgress(0.0),
     m_isSearching(false) {
-    Initialize();
 }
 
 MainWindow::~MainWindow() {
@@ -24,102 +28,186 @@ MainWindow::~MainWindow() {
     }
 }
 
-void MainWindow::Initialize() {
-    m_window = Window();
-    m_window.Title(L"Orion File Search - Windows");
+LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    MainWindow* window = nullptr;
+    if (uMsg == WM_NCCREATE) {
+        CREATESTRUCT* create = reinterpret_cast<CREATESTRUCT*>(lParam);
+        window = reinterpret_cast<MainWindow*>(create->lpCreateParams);
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+        window->m_hwnd = hwnd;
+    } else {
+        window = reinterpret_cast<MainWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    }
 
-    CreateUIElements();
+    if (window) {
+        return window->HandleMessage(uMsg, wParam, lParam);
+    }
+
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+bool MainWindow::Create() {
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = L"OrionMainWindow";
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+
+    if (!RegisterClassEx(&wc)) {
+        return false;
+    }
+
+    RECT windowRect = {0, 0, 800, 600};
+    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+    m_hwnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        L"Orion File Search - Windows",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        nullptr,
+        nullptr,
+        GetModuleHandle(nullptr),
+        this
+    );
+
+    if (!m_hwnd) {
+        return false;
+    }
+
+    CreateControls();
     SetupLayout();
-    RegisterEventHandlers();
+    return true;
 }
 
-void MainWindow::CreateUIElements() {
-    m_rootPanel = StackPanel();
-    m_rootPanel.Padding(Thickness{20, 20, 20, 20});
-    m_rootPanel.Spacing(16);
+void MainWindow::CreateControls() {
+    m_searchQueryEdit = CreateWindowEx(
+        0, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        10, 10, 300, 25,
+        m_hwnd, (HMENU)IDC_SEARCH_QUERY,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    auto searchPanel = StackPanel();
-    searchPanel.Orientation(Orientation::Horizontal);
-    searchPanel.Spacing(8);
+    m_extensionEdit = CreateWindowEx(
+        0, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        320, 10, 100, 25,
+        m_hwnd, (HMENU)IDC_EXTENSION,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    m_searchQueryBox = TextBox();
-    m_searchQueryBox.PlaceholderText(L"Search query");
-    m_searchQueryBox.Width(300);
+    m_pathEdit = CreateWindowEx(
+        0, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        10, 45, 500, 25,
+        m_hwnd, (HMENU)IDC_PATH,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    m_extensionBox = TextBox();
-    m_extensionBox.PlaceholderText(L"Extension (e.g., txt)");
-    m_extensionBox.Width(150);
+    wchar_t currentPath[MAX_PATH];
+    GetCurrentDirectory(MAX_PATH, currentPath);
+    SetWindowText(m_pathEdit, currentPath);
 
-    m_browseButton = Button();
-    m_browseButton.Content(box_value(L"Browse"));
+    m_searchButton = CreateWindow(
+        L"BUTTON", L"Search",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        520, 10, 80, 25,
+        m_hwnd, (HMENU)IDC_SEARCH_BUTTON,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    searchPanel.Children().Append(m_searchQueryBox);
-    searchPanel.Children().Append(m_extensionBox);
-    searchPanel.Children().Append(m_browseButton);
+    m_cancelButton = CreateWindow(
+        L"BUTTON", L"Cancel",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        610, 10, 80, 25,
+        m_hwnd, (HMENU)IDC_CANCEL_BUTTON,
+        GetModuleHandle(nullptr), nullptr
+    );
+    EnableWindow(m_cancelButton, FALSE);
 
-    m_pathBox = TextBox();
-    m_pathBox.PlaceholderText(L"Search path");
-    m_pathBox.Text(std::filesystem::current_path().wstring());
+    m_browseButton = CreateWindow(
+        L"BUTTON", L"Browse",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        520, 45, 80, 25,
+        m_hwnd, (HMENU)IDC_BROWSE_BUTTON,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    auto progressPanel = StackPanel();
-    progressPanel.Orientation(Orientation::Horizontal);
-    progressPanel.Spacing(8);
+    m_progressBar = CreateWindowEx(
+        0, PROGRESS_CLASS, nullptr,
+        WS_CHILD | WS_VISIBLE,
+        10, 80, 680, 20,
+        m_hwnd, (HMENU)IDC_PROGRESS,
+        GetModuleHandle(nullptr), nullptr
+    );
+    SendMessage(m_progressBar, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
 
-    m_progressBar = ProgressBar();
-    m_progressBar.Width(400);
-    m_progressBar.Visibility(Visibility::Collapsed);
+    m_resultsList = CreateWindowEx(
+        0, L"LISTBOX", nullptr,
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | WS_BORDER,
+        10, 110, 680, 440,
+        m_hwnd, (HMENU)IDC_RESULTS,
+        GetModuleHandle(nullptr), nullptr
+    );
 
-    m_searchButton = Button();
-    m_searchButton.Content(box_value(L"Search"));
-
-    m_cancelButton = Button();
-    m_cancelButton.Content(box_value(L"Cancel"));
-    m_cancelButton.Visibility(Visibility::Collapsed);
-
-    progressPanel.Children().Append(m_progressBar);
-    progressPanel.Children().Append(m_searchButton);
-    progressPanel.Children().Append(m_cancelButton);
-
-    m_errorText = TextBlock();
-    m_errorText.Foreground(SolidColorBrush(Windows::UI::Colors::Red()));
-    m_errorText.Visibility(Visibility::Collapsed);
-
-    m_resultsList = ListView();
-    m_resultsList.Height(400);
-    m_resultsList.BorderThickness(Thickness{1});
-    m_resultsList.BorderBrush(SolidColorBrush(Windows::UI::Colors::Gray()));
-
-    m_rootPanel.Children().Append(searchPanel);
-    m_rootPanel.Children().Append(m_pathBox);
-    m_rootPanel.Children().Append(progressPanel);
-    m_rootPanel.Children().Append(m_errorText);
-    m_rootPanel.Children().Append(m_resultsList);
-
-    m_window.Content(m_rootPanel);
+    m_errorText = CreateWindowEx(
+        0, L"STATIC", nullptr,
+        WS_CHILD | SS_LEFT,
+        10, 560, 680, 20,
+        m_hwnd, (HMENU)IDC_ERROR,
+        GetModuleHandle(nullptr), nullptr
+    );
 }
 
-void MainWindow::SetupLayout() {
-    m_window.Activate();
-    m_window.MinWidth(800);
-    m_window.MinHeight(600);
+void MainWindow::SetupLayout() {}
+
+LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDC_SEARCH_BUTTON:
+                    OnSearchButtonClick();
+                    return 0;
+                case IDC_CANCEL_BUTTON:
+                    OnCancelButtonClick();
+                    return 0;
+                case IDC_BROWSE_BUTTON:
+                    OnBrowseButtonClick();
+                    return 0;
+                case IDC_RESULTS:
+                    if (HIWORD(wParam) == LBN_DBLCLK) {
+                        int index = SendMessage(m_resultsList, LB_GETCURSEL, 0, 0);
+                        if (index != LB_ERR) {
+                            OnResultDoubleClick(index);
+                        }
+                    }
+                    return 0;
+            }
+            break;
+
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+    }
+    return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 }
 
-void MainWindow::RegisterEventHandlers() {
-    m_searchButton.Click([this](auto&&, auto&&) { OnSearchButtonClick(nullptr, nullptr); });
-    m_cancelButton.Click([this](auto&&, auto&&) { OnCancelButtonClick(nullptr, nullptr); });
-    m_browseButton.Click([this](auto&&, auto&&) { OnBrowseButtonClick(nullptr, nullptr); });
-    m_resultsList.DoubleTapped([this](auto&&, auto&& e) { OnResultDoubleClick(nullptr, e); });
-}
-
-void MainWindow::OnSearchButtonClick(IInspectable const&, RoutedEventArgs const&) {
+void MainWindow::OnSearchButtonClick() {
     StartSearch();
 }
 
-void MainWindow::OnCancelButtonClick(IInspectable const&, RoutedEventArgs const&) {
+void MainWindow::OnCancelButtonClick() {
     CancelSearch();
 }
 
-void MainWindow::OnBrowseButtonClick(IInspectable const&, RoutedEventArgs const&) {
+void MainWindow::OnBrowseButtonClick() {
     IFileOpenDialog* pFileDialog;
     HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileDialog));
@@ -137,7 +225,7 @@ void MainWindow::OnBrowseButtonClick(IInspectable const&, RoutedEventArgs const&
                     PWSTR pszFilePath;
                     hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
                     if (SUCCEEDED(hr)) {
-                        m_pathBox.Text(pszFilePath);
+                        SetWindowText(m_pathEdit, pszFilePath);
                         CoTaskMemFree(pszFilePath);
                     }
                     pItem->Release();
@@ -148,31 +236,45 @@ void MainWindow::OnBrowseButtonClick(IInspectable const&, RoutedEventArgs const&
     }
 }
 
-void MainWindow::OnResultDoubleClick(IInspectable const&, Input::DoubleTappedRoutedEventArgs const&) {
-    if (auto selected = m_resultsList.SelectedItem()) {
-        if (auto result = selected.try_as<PropertyValue>()) {
-            std::wstring path = result.GetString();
-            ShellExecute(nullptr, L"explore", path.c_str(), nullptr, nullptr, SW_SHOW);
-        }
+void MainWindow::OnResultDoubleClick(int index) {
+    if (index >= 0 && index < static_cast<int>(m_searchResults.size())) {
+        ShellExecute(nullptr, L"explore", m_searchResults[index].path.c_str(),
+                    nullptr, nullptr, SW_SHOW);
     }
 }
 
 void MainWindow::StartSearch() {
+    wchar_t queryBuffer[256];
+    wchar_t pathBuffer[MAX_PATH];
+    wchar_t extensionBuffer[32];
+
+    GetWindowText(m_searchQueryEdit, queryBuffer, 256);
+    GetWindowText(m_pathEdit, pathBuffer, MAX_PATH);
+    GetWindowText(m_extensionEdit, extensionBuffer, 32);
+
+    if (wcslen(queryBuffer) == 0) {
+        MessageBox(m_hwnd, L"Please enter a search query", L"Error", MB_OK | MB_ICONERROR);
+        return;
+    }
+
     CancelSearch();
+    if (m_searchThread.joinable()) {
+        m_searchThread.join();
+    }
+
     m_shouldCancel = false;
-    m_searchProgress = 0;
     m_isSearching = true;
-    m_errorText.Visibility(Visibility::Collapsed);
-    m_progressBar.Visibility(Visibility::Visible);
-    m_searchButton.Visibility(Visibility::Collapsed);
-    m_cancelButton.Visibility(Visibility::Visible);
-    m_resultsList.Items().Clear();
+    SendMessage(m_resultsList, LB_RESETCONTENT, 0, 0);
+    EnableWindow(m_searchButton, FALSE);
+    EnableWindow(m_cancelButton, TRUE);
+    EnableWindow(m_searchQueryEdit, FALSE);
+    EnableWindow(m_pathEdit, FALSE);
+    EnableWindow(m_extensionEdit, FALSE);
+    ShowWindow(m_errorText, SW_HIDE);
 
-    std::wstring query = m_searchQueryBox.Text();
-    std::wstring path = m_pathBox.Text();
-    std::wstring extension = m_extensionBox.Text();
-
-    m_searchThread = std::thread([this, query, path, extension]() {
+    m_searchThread = std::thread([this, query = std::wstring(queryBuffer),
+                                path = std::wstring(pathBuffer),
+                                extension = std::wstring(extensionBuffer)]() {
         PerformSearch(query, path, extension);
     });
 }
@@ -184,20 +286,28 @@ void MainWindow::CancelSearch() {
             m_searchThread.join();
         }
         m_isSearching = false;
-        m_progressBar.Visibility(Visibility::Collapsed);
-        m_searchButton.Visibility(Visibility::Visible);
-        m_cancelButton.Visibility(Visibility::Collapsed);
+        EnableWindow(m_searchButton, TRUE);
+        EnableWindow(m_cancelButton, FALSE);
+        EnableWindow(m_searchQueryEdit, TRUE);
+        EnableWindow(m_pathEdit, TRUE);
+        EnableWindow(m_extensionEdit, TRUE);
+        SendMessage(m_progressBar, PBM_SETPOS, 0, 0);
     }
 }
 
-void MainWindow::PerformSearch(const std::wstring& query, const std::wstring& directory, const std::wstring& extension) {
+void MainWindow::UpdateProgress(double progress) {
+    SendMessage(m_progressBar, PBM_SETPOS, static_cast<int>(progress * 100), 0);
+}
+
+void MainWindow::PerformSearch(const std::wstring& query, const std::wstring& directory,
+                             const std::wstring& extension) {
     std::vector<SearchResult> results;
     std::error_code ec;
     auto dirIter = std::filesystem::recursive_directory_iterator(directory, ec);
+
     if (ec) {
-        m_window.DispatcherQueue().TryEnqueue([this, ec]() {
-            ShowError(L"Error accessing directory: " + std::wstring(ec.message().begin(), ec.message().end()));
-        });
+        PostMessage(m_hwnd, WM_COMMAND, IDC_ERROR,
+                   reinterpret_cast<LPARAM>(L"Error accessing directory"));
         return;
     }
 
@@ -224,50 +334,31 @@ void MainWindow::PerformSearch(const std::wstring& query, const std::wstring& di
         std::wstring filename = file.filename().wstring();
         std::wstring lowerFilename;
         std::wstring lowerQuery;
-        std::transform(filename.begin(), filename.end(), std::back_inserter(lowerFilename), ::towlower);
-        std::transform(query.begin(), query.end(), std::back_inserter(lowerQuery), ::towlower);
+        lowerFilename.resize(filename.size());
+        lowerQuery.resize(query.size());
+        std::transform(filename.begin(), filename.end(), lowerFilename.begin(), ::towlower);
+        std::transform(query.begin(), query.end(), lowerQuery.begin(), ::towlower);
 
         if (lowerFilename.find(lowerQuery) != std::wstring::npos) {
             SearchResult result;
             result.path = file.wstring();
             result.id = std::to_wstring(results.size());
             results.push_back(result);
+
+            SendMessage(m_resultsList, LB_ADDSTRING, 0,
+                       reinterpret_cast<LPARAM>(result.path.c_str()));
         }
 
         processedFiles++;
         UpdateProgress(static_cast<double>(processedFiles) / allFiles.size());
     }
 
-    m_window.DispatcherQueue().TryEnqueue([this, results]() {
-        UpdateSearchResults(results);
-    });
-}
-
-void MainWindow::UpdateProgress(double progress) {
-    m_window.DispatcherQueue().TryEnqueue([this, progress]() {
-        m_progressBar.Value(progress * 100);
-    });
-}
-
-void MainWindow::UpdateSearchResults(const std::vector<SearchResult>& results) {
     m_searchResults = results;
-    m_resultsList.Items().Clear();
-
-    for (const auto& result : results) {
-        m_resultsList.Items().Append(box_value(result.path));
-    }
-
-    m_isSearching = false;
-    m_progressBar.Visibility(Visibility::Collapsed);
-    m_searchButton.Visibility(Visibility::Visible);
-    m_cancelButton.Visibility(Visibility::Collapsed);
+    PostMessage(m_hwnd, WM_COMMAND, IDC_SEARCH_BUTTON, 0);
 }
 
 void MainWindow::ShowError(const std::wstring& message) {
-    m_errorText.Text(message);
-    m_errorText.Visibility(Visibility::Visible);
-    m_isSearching = false;
-    m_progressBar.Visibility(Visibility::Collapsed);
-    m_searchButton.Visibility(Visibility::Visible);
-    m_cancelButton.Visibility(Visibility::Collapsed);
+    SetWindowText(m_errorText, message.c_str());
+    ShowWindow(m_errorText, SW_SHOW);
 }
+

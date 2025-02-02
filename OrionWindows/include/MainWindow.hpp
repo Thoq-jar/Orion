@@ -1,11 +1,7 @@
 #pragma once
 
 #include <windows.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Microsoft.UI.Xaml.h>
-#include <winrt/Microsoft.UI.Xaml.Controls.h>
-#include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
-#include <winrt/Microsoft.UI.Windowing.h>
+#include <commctrl.h>
 #include <string>
 #include <vector>
 #include <thread>
@@ -21,22 +17,21 @@ public:
     MainWindow();
     ~MainWindow();
 
-    void Initialize();
-    winrt::Microsoft::UI::Xaml::Window& GetWindow() { return m_window; }
+    bool Create();
+    HWND GetHandle() const { return m_hwnd; }
 
 private:
-    // UI Elements
-    winrt::Microsoft::UI::Xaml::Window m_window{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::StackPanel m_rootPanel{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::TextBox m_searchQueryBox{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::TextBox m_extensionBox{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::TextBox m_pathBox{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::Button m_searchButton{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::Button m_cancelButton{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::Button m_browseButton{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::ProgressBar m_progressBar{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::ListView m_resultsList{ nullptr };
-    winrt::Microsoft::UI::Xaml::Controls::TextBlock m_errorText{ nullptr };
+    // Window handles
+    HWND m_hwnd;
+    HWND m_searchQueryEdit;
+    HWND m_extensionEdit;
+    HWND m_pathEdit;
+    HWND m_searchButton;
+    HWND m_cancelButton;
+    HWND m_browseButton;
+    HWND m_progressBar;
+    HWND m_resultsList;
+    HWND m_errorText;
 
     // Search state
     std::atomic<bool> m_shouldCancel;
@@ -45,15 +40,15 @@ private:
     double m_searchProgress;
     bool m_isSearching;
 
+    // Window procedure
+    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+
     // UI Event handlers
-    void OnSearchButtonClick(winrt::Windows::Foundation::IInspectable const& sender,
-                           winrt::Microsoft::UI::Xaml::RoutedEventArgs const& args);
-    void OnCancelButtonClick(winrt::Windows::Foundation::IInspectable const& sender,
-                           winrt::Microsoft::UI::Xaml::RoutedEventArgs const& args);
-    void OnBrowseButtonClick(winrt::Windows::Foundation::IInspectable const& sender,
-                           winrt::Microsoft::UI::Xaml::RoutedEventArgs const& args);
-    void OnResultDoubleClick(winrt::Windows::Foundation::IInspectable const& sender,
-                           winrt::Microsoft::UI::Xaml::Input::DoubleTappedRoutedEventArgs const& args);
+    void OnSearchButtonClick();
+    void OnCancelButtonClick();
+    void OnBrowseButtonClick();
+    void OnResultDoubleClick(int index);
 
     // Search methods
     void StartSearch();
@@ -64,7 +59,6 @@ private:
     void ShowError(const std::wstring& message);
 
     // Helper methods
-    void CreateUIElements();
+    void CreateControls();
     void SetupLayout();
-    void RegisterEventHandlers();
 }; 
