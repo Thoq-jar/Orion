@@ -9,13 +9,15 @@ let package = Package(
     products: [
         .library(
             name: "OrionKit",
-            targets: ["OrionKit"]),
+            type: .dynamic,
+            targets: ["OrionKit", "COrionKit"]),
     ],
     targets: [
         .target(
-            name: "OrionKit"),
-        .testTarget(
-            name: "OrionKitTests",
-            dependencies: ["OrionKit"]),
+            name: "COrionKit",
+            publicHeadersPath: "include"),
+        .target(
+            name: "OrionKit",
+            dependencies: ["COrionKit"])
     ]
 )

@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  Orion
 //
-//  Created by Tristan Shaw on 2/2/25.
+//  Created by Tristan on 2/2/25.
 //
 
 import SwiftUI

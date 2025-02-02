@@ -76,7 +76,23 @@ public class FileSearcher {
     public func openInFinder(path: String) {
         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
     }
+    #elseif os(Linux)
+    public func openInFinder(path: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xdg-open")
+        process.arguments = [path]
+        try? process.run()
+    }
+    #elseif os(Windows)
+    public func openInFinder(path: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "C:\\Windows\\explorer.exe")
+        process.arguments = ["/select,", path]
+        try? process.run()
+    }
     #else
-    public func openInFinder(path: String) {}
+    public func openInFinder(path: String) {
+        print("Unsupported platform")
+    }
     #endif
 }
