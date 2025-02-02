@@ -18,6 +18,9 @@
 #define IDC_RESULTS 108
 #define IDC_ERROR 109
 
+#define IDM_FILE_EXIT 201
+#define IDM_VIEW_DARKMODE 202
+
 MainWindow::MainWindow() : 
     m_hwnd(nullptr),
     m_shouldCancel(false),
@@ -65,6 +68,30 @@ bool MainWindow::Create() {
         return false;
     }
 
+    HMENU hMenu = CreateMenu();
+    HMENU hFileMenu = CreatePopupMenu();
+    HMENU hViewMenu = CreatePopupMenu();
+    
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hViewMenu, L"&View");
+    
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
+    AppendMenu(hViewMenu, MF_STRING, IDM_VIEW_DARKMODE, L"&Dark Mode");
+
+
+    BOOL isDarkMode = FALSE;
+    HKEY hKey;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Orion\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD value = 0;
+        DWORD size = sizeof(value);
+        if (RegQueryValueEx(hKey, L"DarkMode", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+            isDarkMode = value != 0;
+        }
+        RegCloseKey(hKey);
+    }
+
+    CheckMenuItem(hViewMenu, IDM_VIEW_DARKMODE, MF_BYCOMMAND | (isDarkMode ? MF_CHECKED : MF_UNCHECKED));
+
     HDC hdc = GetDC(nullptr);
     int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
     ReleaseDC(nullptr, hdc);
@@ -74,7 +101,7 @@ bool MainWindow::Create() {
     int windowHeight = static_cast<int>(600 * dpiScale);
 
     RECT windowRect = {0, 0, windowWidth, windowHeight};
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, TRUE);
 
     m_hwnd = CreateWindowEx(
         0,
@@ -85,24 +112,13 @@ bool MainWindow::Create() {
         windowRect.right - windowRect.left,
         windowRect.bottom - windowRect.top,
         nullptr,
-        nullptr,
+        hMenu,
         GetModuleHandle(nullptr),
         this
     );
 
     if (!m_hwnd) {
         return false;
-    }
-
-    BOOL isDarkMode = FALSE;
-    HKEY hKey;
-    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-        DWORD value = 0;
-        DWORD size = sizeof(value);
-        if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
-            isDarkMode = value != 0;
-        }
-        RegCloseKey(hKey);
     }
 
     BOOL value = isDarkMode ? TRUE : FALSE;
@@ -288,6 +304,57 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
                         if (index != LB_ERR) {
                             OnResultDoubleClick(index);
                         }
+                    }
+                    return 0;
+                case IDM_FILE_EXIT:
+                    if (HIWORD(wParam) == 0) {
+                        DestroyWindow(m_hwnd);
+                    }
+                    return 0;
+                case IDM_VIEW_DARKMODE:
+                    if (HIWORD(wParam) == 0) {
+                        HMENU hMenu = GetMenu(m_hwnd);
+                        HMENU hViewMenu = GetSubMenu(hMenu, 1);
+                        BOOL isDarkMode = (GetMenuState(hViewMenu, IDM_VIEW_DARKMODE, MF_BYCOMMAND) & MF_CHECKED) != 0;
+                        
+                        isDarkMode = !isDarkMode;
+                        
+                        HKEY hKey;
+                        if (RegCreateKeyEx(HKEY_CURRENT_USER, L"Software\\Orion\\Settings", 0, NULL, 
+                            REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
+                            DWORD value = isDarkMode ? 1 : 0;
+                            RegSetValueEx(hKey, L"DarkMode", 0, REG_DWORD, (BYTE*)&value, sizeof(value));
+                            RegCloseKey(hKey);
+                        }
+
+                        CheckMenuItem(hViewMenu, IDM_VIEW_DARKMODE, MF_BYCOMMAND | (isDarkMode ? MF_CHECKED : MF_UNCHECKED));
+
+                        BOOL value = isDarkMode ? TRUE : FALSE;
+                        DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+
+                        if (isDarkMode) {
+                            SetWindowTheme(m_searchQueryEdit, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_extensionEdit, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_pathEdit, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_resultsList, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_searchButton, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_cancelButton, L"DarkMode_Explorer", nullptr);
+                            SetWindowTheme(m_browseButton, L"DarkMode_Explorer", nullptr);
+                            SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
+                            SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(50, 50, 50));
+                        } else {
+                            SetWindowTheme(m_searchQueryEdit, L"Explorer", nullptr);
+                            SetWindowTheme(m_extensionEdit, L"Explorer", nullptr);
+                            SetWindowTheme(m_pathEdit, L"Explorer", nullptr);
+                            SetWindowTheme(m_resultsList, L"Explorer", nullptr);
+                            SetWindowTheme(m_searchButton, L"Explorer", nullptr);
+                            SetWindowTheme(m_cancelButton, L"Explorer", nullptr);
+                            SetWindowTheme(m_browseButton, L"Explorer", nullptr);
+                            SendMessage(m_progressBar, PBM_SETBARCOLOR, 0, RGB(0, 255, 0));
+                            SendMessage(m_progressBar, PBM_SETBKCOLOR, 0, RGB(200, 200, 200));
+                        }
+
+                        InvalidateRect(m_hwnd, nullptr, TRUE);
                     }
                     return 0;
             }
