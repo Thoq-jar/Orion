@@ -125,10 +125,6 @@ void MainWindow::CreateControls() {
     int controlHeight = static_cast<int>(25 * dpiScale);
     int buttonWidth = static_cast<int>(80 * dpiScale);
 
-    RECT clientRect;
-    GetClientRect(m_hwnd, &clientRect);
-    int clientWidth = clientRect.right - clientRect.left;
-
     m_searchQueryEdit = CreateWindowEx(
         0, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
@@ -147,19 +143,10 @@ void MainWindow::CreateControls() {
         GetModuleHandle(nullptr), nullptr
     );
 
-    m_pathEdit = CreateWindowEx(
-        0, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-        margin, margin + controlHeight + 5, 
-        static_cast<int>(500 * dpiScale), controlHeight,
-        m_hwnd, (HMENU)IDC_PATH,
-        GetModuleHandle(nullptr), nullptr
-    );
-
     m_searchButton = CreateWindow(
         L"BUTTON", L"Search",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        margin + static_cast<int>(320 * dpiScale), margin + 5, 
+        margin + static_cast<int>(420 * dpiScale), margin,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_SEARCH_BUTTON,
         GetModuleHandle(nullptr), nullptr
@@ -168,17 +155,26 @@ void MainWindow::CreateControls() {
     m_cancelButton = CreateWindow(
         L"BUTTON", L"Cancel",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        margin + static_cast<int>(410 * dpiScale), margin + 5, 
+        margin + static_cast<int>(510 * dpiScale), margin,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_CANCEL_BUTTON,
         GetModuleHandle(nullptr), nullptr
     );
     EnableWindow(m_cancelButton, FALSE);
 
+    m_pathEdit = CreateWindowEx(
+        0, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+        margin, margin + controlHeight + 10,
+        static_cast<int>(500 * dpiScale), controlHeight,
+        m_hwnd, (HMENU)IDC_PATH,
+        GetModuleHandle(nullptr), nullptr
+    );
+
     m_browseButton = CreateWindow(
         L"BUTTON", L"Browse",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        margin + static_cast<int>(320 * dpiScale), margin + controlHeight + 5, 
+        margin + static_cast<int>(510 * dpiScale), margin + controlHeight + 10,
         buttonWidth, controlHeight,
         m_hwnd, (HMENU)IDC_BROWSE_BUTTON,
         GetModuleHandle(nullptr), nullptr
@@ -187,7 +183,7 @@ void MainWindow::CreateControls() {
     m_progressBar = CreateWindowEx(
         0, PROGRESS_CLASS, nullptr,
         WS_CHILD | WS_VISIBLE,
-        margin, margin + 2 * controlHeight + 10, 
+        margin, margin + 2 * controlHeight + 20,
         static_cast<int>(680 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_PROGRESS,
         GetModuleHandle(nullptr), nullptr
@@ -197,7 +193,7 @@ void MainWindow::CreateControls() {
     m_resultsList = CreateWindowEx(
         0, L"LISTBOX", nullptr,
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | WS_BORDER,
-        margin, margin + 3 * controlHeight + 15, 
+        margin, margin + 3 * controlHeight + 30,
         static_cast<int>(680 * dpiScale), static_cast<int>(440 * dpiScale),
         m_hwnd, (HMENU)IDC_RESULTS,
         GetModuleHandle(nullptr), nullptr
@@ -206,7 +202,7 @@ void MainWindow::CreateControls() {
     m_errorText = CreateWindowEx(
         0, L"STATIC", nullptr,
         WS_CHILD | SS_LEFT,
-        margin, margin + 4 * controlHeight + 550, 
+        margin, margin + 3 * controlHeight + static_cast<int>(480 * dpiScale),
         static_cast<int>(680 * dpiScale), controlHeight,
         m_hwnd, (HMENU)IDC_ERROR,
         GetModuleHandle(nullptr), nullptr
@@ -228,10 +224,6 @@ void MainWindow::CreateControls() {
     SendMessage(m_resultsList, WM_SETFONT, (WPARAM)hFont, TRUE);
     SendMessage(m_errorText, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-    SendMessage(m_searchQueryEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Enter search query...");
-    SendMessage(m_extensionEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"File extension...");
-    SendMessage(m_pathEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Search path...");
-
     wchar_t currentPath[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, currentPath);
     SetWindowText(m_pathEdit, currentPath);
@@ -252,13 +244,19 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
                 case IDC_SEARCH_BUTTON:
-                    OnSearchButtonClick();
+                    if (HIWORD(wParam) == BN_CLICKED) {
+                        OnSearchButtonClick();
+                    }
                     return 0;
                 case IDC_CANCEL_BUTTON:
-                    OnCancelButtonClick();
+                    if (HIWORD(wParam) == BN_CLICKED) {
+                        OnCancelButtonClick();
+                    }
                     return 0;
                 case IDC_BROWSE_BUTTON:
-                    OnBrowseButtonClick();
+                    if (HIWORD(wParam) == BN_CLICKED) {
+                        OnBrowseButtonClick();
+                    }
                     return 0;
                 case IDC_RESULTS:
                     if (HIWORD(wParam) == LBN_DBLCLK) {
@@ -271,6 +269,31 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             }
             break;
 
+        case WM_SETTINGCHANGE:
+            if (lParam && wcscmp(reinterpret_cast<LPCWSTR>(lParam), L"ImmersiveColorSet") == 0) {
+                BOOL isDarkMode = FALSE;
+                HKEY hKey;
+                if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                    DWORD value = 0;
+                    DWORD size = sizeof(value);
+                    if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+                        isDarkMode = value != 0;
+                    }
+                    RegCloseKey(hKey);
+                }
+                if (isDarkMode) {
+                    BOOL value = TRUE;
+                    DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+                    SetWindowTheme(m_hwnd, L"DarkMode_Explorer", nullptr);
+                } else {
+                    BOOL value = FALSE;
+                    DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+                    SetWindowTheme(m_hwnd, L"Explorer", nullptr);
+                }
+                InvalidateRect(m_hwnd, nullptr, TRUE);
+            }
+            break;
+
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLOREDIT:
         case WM_CTLCOLORLISTBOX:
@@ -279,15 +302,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
             HWND hwnd = (HWND)lParam;
             
             BOOL isDarkMode = FALSE;
-            HKEY hKey;
-            if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-                DWORD value = 0;
-                DWORD size = sizeof(value);
-                if (RegQueryValueEx(hKey, L"AppsUseDarkTheme", NULL, NULL, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
-                    isDarkMode = value != 0;
-                }
-                RegCloseKey(hKey);
-            }
+            DwmGetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
 
             if (isDarkMode) {
                 SetTextColor(hdc, RGB(255, 255, 255));
@@ -295,11 +310,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
                 static HBRUSH hBrush = CreateSolidBrush(RGB(32, 32, 32));
                 return (LRESULT)hBrush;
             }
-            else {
-                SetTextColor(hdc, RGB(0, 0, 0));
-                SetBkColor(hdc, RGB(255, 255, 255));
-                return (LRESULT)GetStockObject(WHITE_BRUSH);
-            }
+            return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
         }
 
         case WM_DESTROY:
@@ -474,15 +485,26 @@ void MainWindow::PerformSearch(const std::wstring& query, const std::wstring& di
             double progress = static_cast<double>(processedFiles) / totalFiles;
             PostMessage(m_hwnd, WM_USER + 1, static_cast<WPARAM>(progress * 100), 0);
         }
+
+        m_searchResults = results;
+        m_isSearching = false;
+        EnableWindow(m_searchButton, TRUE);
+        EnableWindow(m_cancelButton, FALSE);
+        EnableWindow(m_searchQueryEdit, TRUE);
+        EnableWindow(m_pathEdit, TRUE);
+        EnableWindow(m_extensionEdit, TRUE);
     }
     catch (const std::exception& e) {
         PostMessage(m_hwnd, WM_USER + 2, 0,
                    reinterpret_cast<LPARAM>(L"Error accessing directory"));
+        m_isSearching = false;
+        EnableWindow(m_searchButton, TRUE);
+        EnableWindow(m_cancelButton, FALSE);
+        EnableWindow(m_searchQueryEdit, TRUE);
+        EnableWindow(m_pathEdit, TRUE);
+        EnableWindow(m_extensionEdit, TRUE);
         return;
     }
-
-    m_searchResults = results;
-    PostMessage(m_hwnd, WM_COMMAND, IDC_SEARCH_BUTTON, 0);
 }
 
 void MainWindow::ShowError(const std::wstring& message) {
