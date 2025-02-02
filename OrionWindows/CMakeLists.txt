@@ -4,7 +4,8 @@ project(OrionWindows)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(WindowsAppSDK PATHS "C:/Program Files (x86)/Microsoft SDKs/Windows Kits/10/ExtensionSDKs/Microsoft.WindowsAppRuntime.1.5")
+set(WINDOWSAPPSDK_PATH "C:/Program Files (x86)/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include/winrt")
+set(WINDOWSAPPSDK_LIB_PATH "C:/Program Files (x86)/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64")
 
 set(SOURCES
     src/main.cpp
@@ -23,21 +24,22 @@ set_target_properties(OrionWindows PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$(Configuration)"
 )
 
-# Add Windows App SDK package reference for Visual Studio
-set_property(TARGET OrionWindows PROPERTY
-    VS_PACKAGE_REFERENCES "Microsoft.WindowsAppSDK_1.5.240227000"
-)
-
 target_include_directories(OrionWindows PRIVATE 
     include
+    "${WINDOWSAPPSDK_PATH}"
     "$ENV{WindowsSdkDir}Include/$ENV{WindowsTargetPlatformVersion}/um"
     "$ENV{WindowsSdkDir}Include/$ENV{WindowsTargetPlatformVersion}/winrt"
+    "$ENV{WindowsSdkDir}Include/$ENV{WindowsTargetPlatformVersion}/shared"
+    "$ENV{WindowsSdkDir}Include/$ENV{WindowsTargetPlatformVersion}/cppwinrt"
 )
 
 target_link_directories(OrionWindows PRIVATE 
-    "$ENV{WindowsSdkDir}Lib/$ENV{WindowsTargetPlatformVersion}/um/${CMAKE_SYSTEM_PROCESSOR}"
+    "${WINDOWSAPPSDK_LIB_PATH}"
+    "$ENV{WindowsSdkDir}Lib/$ENV{WindowsTargetPlatformVersion}/um/x64"
 )
 
 target_link_libraries(OrionWindows PRIVATE
     WindowsApp.lib
+    Shlwapi.lib
+    Shell32.lib
 )
