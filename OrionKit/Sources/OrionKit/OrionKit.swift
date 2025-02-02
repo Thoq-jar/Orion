@@ -49,6 +49,10 @@ public class FileSearcher {
             let totalFiles = Double(allPaths.count)
             var processed: Double = 0
             
+            let components = query.components(separatedBy: " extension:")
+            let searchQuery = components[0]
+            let fileExtension = components.count > 1 ? components[1].trimmingCharacters(in: .whitespaces) : nil
+            
             for path in allPaths {
                 try Task.checkCancellation()
                 
@@ -56,7 +60,18 @@ public class FileSearcher {
                 var isDirectory: ObjCBool = false
                 
                 if fileManager.fileExists(atPath: fullPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
-                    if path.localizedCaseInsensitiveContains(query) {
+                    if let ext = fileExtension {
+                        let pathExt = (path as NSString).pathExtension.lowercased()
+                        let searchExt = ext.hasPrefix(".") ? String(ext.dropFirst()).lowercased() : ext.lowercased()
+                        
+                        if pathExt != searchExt {
+                            processed += 1
+                            progress(processed / totalFiles)
+                            continue
+                        }
+                    }
+                    
+                    if path.localizedCaseInsensitiveContains(searchQuery) {
                         results.append(SearchResult(path: fullPath))
                     }
                 }

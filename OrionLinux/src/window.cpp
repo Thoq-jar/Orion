@@ -34,6 +34,14 @@ void MainWindow::setup_ui() {
   g_free(cwd);
   gtk_box_pack_start(GTK_BOX(search_box), path_entry, TRUE, TRUE, 0);
 
+  GtkWidget *ext_label = gtk_label_new("Extension:");
+  gtk_box_pack_start(GTK_BOX(search_box), ext_label, FALSE, FALSE, 0);
+
+  extension_entry = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(extension_entry), "e.g., .txt, .cpp");
+  gtk_entry_set_width_chars(GTK_ENTRY(extension_entry), 10);
+  gtk_box_pack_start(GTK_BOX(search_box), extension_entry, FALSE, FALSE, 0);
+
   search_entry = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(search_entry),
                                  "Enter search query...");
@@ -81,6 +89,7 @@ void MainWindow::update_search_controls(bool searching) {
   gtk_widget_set_sensitive(cancel_button, searching);
   gtk_widget_set_sensitive(search_entry, !searching);
   gtk_widget_set_sensitive(path_entry, !searching);
+  gtk_widget_set_sensitive(extension_entry, !searching);
 
   if (!searching) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_bar), 0.0);
@@ -90,6 +99,7 @@ void MainWindow::update_search_controls(bool searching) {
 void MainWindow::start_search() {
   const char *query = gtk_entry_get_text(GTK_ENTRY(search_entry));
   const char *directory = gtk_entry_get_text(GTK_ENTRY(path_entry));
+  const char *extension = gtk_entry_get_text(GTK_ENTRY(extension_entry));
 
   if (strlen(query) == 0) {
     GtkWidget *dialog = gtk_message_dialog_new(
@@ -110,8 +120,8 @@ void MainWindow::start_search() {
   gtk_list_store_clear(list_store);
 
   search_thread = std::make_unique<std::thread>(
-      [this, query = std::string(query), directory = std::string(directory)]() {
-        perform_search(query, directory);
+      [this, query = std::string(query), directory = std::string(directory), extension = std::string(extension)]() {
+        perform_search(query, directory, extension);
       });
 }
 
@@ -140,10 +150,18 @@ static void progress_callback(double progress, void *user_data) {
   window->update_progress(progress);
 }
 
-void MainWindow::perform_search(const std::string &query,
-                                const std::string &directory) {
+void MainWindow::perform_search(const std::string &query, const std::string &directory, const std::string &extension) {
+  std::string full_query = query;
+  if (!extension.empty()) {
+    std::string ext = extension;
+    if (!ext.empty() && ext[0] != '.') {
+      ext = "." + ext;
+    }
+    full_query = query + " extension:" + ext;
+  }
+
   orion_search_results_t *results = orion_search_files(
-      query.c_str(), directory.c_str(), progress_callback, this);
+      full_query.c_str(), directory.c_str(), progress_callback, this);
   if (results && !should_cancel) {
     std::vector<FileSearchResult> cpp_results;
     for (int i = 0; i < results->count; i++) {

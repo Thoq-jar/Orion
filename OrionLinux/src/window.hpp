@@ -24,6 +24,7 @@ private:
   GtkWidget *window;
   GtkWidget *path_entry;
   GtkWidget *search_entry;
+  GtkWidget *extension_entry;
   GtkWidget *search_button;
   GtkWidget *cancel_button;
   GtkWidget *progress_bar;
@@ -39,7 +40,7 @@ private:
 
   void start_search();
   void cancel_search();
-  void perform_search(const std::string &query, const std::string &directory);
+  void perform_search(const std::string &query, const std::string &directory, const std::string &extension);
   void update_results(const std::vector<FileSearchResult> &results);
   void update_search_controls(bool searching);
 

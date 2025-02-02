@@ -11,6 +11,7 @@ import OrionKit
 struct ContentView: View {
     @State private var searchQuery = ""
     @State private var searchPath = FileManager.default.homeDirectoryForCurrentUser.path
+    @State private var fileExtension = ""
     @State private var searchResults: [SearchResult] = []
     @State private var searchProgress: Double = 0
     @State private var isSearching = false
@@ -26,6 +27,10 @@ struct ContentView: View {
                 HStack {
                     TextField("Search query", text: $searchQuery)
                         .textFieldStyle(.roundedBorder)
+                    
+                    TextField("Extension (e.g., txt)", text: $fileExtension)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 150)
                     
                     Button("Browse") {
                         let panel = NSOpenPanel()
@@ -101,7 +106,7 @@ struct ContentView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
-        .frame(minWidth: 400, minHeight: 300)
+        .frame(minWidth: 600, minHeight: 300)
     }
     
     private func isSelected(result: SearchResult) -> Bool {
@@ -117,9 +122,15 @@ struct ContentView: View {
             errorMessage = nil
             searchResults = []
             
+            var fullQuery = searchQuery
+            if !fileExtension.isEmpty {
+                let ext = fileExtension.hasPrefix(".") ? fileExtension : "." + fileExtension
+                fullQuery += " extension:" + ext
+            }
+            
             do {
                 searchResults = try await searcher.search(
-                    query: searchQuery,
+                    query: fullQuery,
                     in: searchPath
                 ) { progress in
                     searchProgress = progress
