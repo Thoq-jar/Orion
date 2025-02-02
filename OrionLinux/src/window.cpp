@@ -1,15 +1,15 @@
 #include "window.hpp"
 #include <iostream>
 
-MainWindow::MainWindow() : is_searching(false), should_cancel(false) { 
-    setup_ui(); 
+MainWindow::MainWindow() : is_searching(false), should_cancel(false) {
+  setup_ui();
 }
 
 MainWindow::~MainWindow() {
-    cancel_search();
-    if (search_thread && search_thread->joinable()) {
-        search_thread->join();
-    }
+  cancel_search();
+  if (search_thread && search_thread->joinable()) {
+    search_thread->join();
+  }
 }
 
 void MainWindow::setup_ui() {
@@ -76,127 +76,138 @@ void MainWindow::setup_ui() {
 }
 
 void MainWindow::update_search_controls(bool searching) {
-    is_searching = searching;
-    gtk_widget_set_sensitive(search_button, !searching);
-    gtk_widget_set_sensitive(cancel_button, searching);
-    gtk_widget_set_sensitive(search_entry, !searching);
-    gtk_widget_set_sensitive(path_entry, !searching);
-    
-    if (!searching) {
-        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_bar), 0.0);
-    }
+  is_searching = searching;
+  gtk_widget_set_sensitive(search_button, !searching);
+  gtk_widget_set_sensitive(cancel_button, searching);
+  gtk_widget_set_sensitive(search_entry, !searching);
+  gtk_widget_set_sensitive(path_entry, !searching);
+
+  if (!searching) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_bar), 0.0);
+  }
 }
 
 void MainWindow::start_search() {
-    const char* query = gtk_entry_get_text(GTK_ENTRY(search_entry));
-    const char* directory = gtk_entry_get_text(GTK_ENTRY(path_entry));
-    
-    if (strlen(query) == 0) {
-        GtkWidget* dialog = gtk_message_dialog_new(GTK_WINDOW(window),
-                                                GTK_DIALOG_MODAL,
-                                                GTK_MESSAGE_ERROR,
-                                                GTK_BUTTONS_OK,
-                                                "Please enter a search query");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        return;
-    }
-    
-    cancel_search();
-    if (search_thread && search_thread->joinable()) {
-        search_thread->join();
-    }
-    
-    should_cancel = false;
-    update_search_controls(true);
-    gtk_list_store_clear(list_store);
-    
-    search_thread = std::make_unique<std::thread>([this, query=std::string(query), directory=std::string(directory)]() {
+  const char *query = gtk_entry_get_text(GTK_ENTRY(search_entry));
+  const char *directory = gtk_entry_get_text(GTK_ENTRY(path_entry));
+
+  if (strlen(query) == 0) {
+    GtkWidget *dialog = gtk_message_dialog_new(
+        GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+        "Please enter a search query");
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    return;
+  }
+
+  cancel_search();
+  if (search_thread && search_thread->joinable()) {
+    search_thread->join();
+  }
+
+  should_cancel = false;
+  update_search_controls(true);
+  gtk_list_store_clear(list_store);
+
+  search_thread = std::make_unique<std::thread>(
+      [this, query = std::string(query), directory = std::string(directory)]() {
         perform_search(query, directory);
-    });
+      });
 }
 
 void MainWindow::cancel_search() {
-    should_cancel = true;
-    update_search_controls(false);
+  should_cancel = true;
+  update_search_controls(false);
 }
 
 void MainWindow::update_progress(double progress) {
-    gdk_threads_add_idle([](gpointer data) -> gboolean {
-        auto params = static_cast<std::pair<MainWindow*, double>*>(data);
+  gdk_threads_add_idle(
+      [](gpointer data) -> gboolean {
+        auto params = static_cast<std::pair<MainWindow *, double> *>(data);
         auto [window, progress] = *params;
-        
-        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(window->progress_bar), progress);
-        
+
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(window->progress_bar),
+                                      progress);
+
         delete params;
         return G_SOURCE_REMOVE;
-    }, new std::pair<MainWindow*, double>(this, progress));
+      },
+      new std::pair<MainWindow *, double>(this, progress));
 }
 
-static void progress_callback(double progress, void* user_data) {
-    MainWindow* window = static_cast<MainWindow*>(user_data);
-    window->update_progress(progress);
+static void progress_callback(double progress, void *user_data) {
+  MainWindow *window = static_cast<MainWindow *>(user_data);
+  window->update_progress(progress);
 }
 
-void MainWindow::perform_search(const std::string& query, const std::string& directory) {
-    orion_search_results_t* results = orion_search_files(query.c_str(), directory.c_str(), progress_callback, this);
-    if (results && !should_cancel) {
-        std::vector<FileSearchResult> cpp_results;
-        for (int i = 0; i < results->count; i++) {
-            cpp_results.push_back(FileSearchResult{results->results[i].path});
-        }
-        
-        gdk_threads_add_idle([](gpointer data) -> gboolean {
-            auto params = static_cast<std::pair<MainWindow*, std::vector<FileSearchResult>>*>(data);
-            auto [window, results] = *params;
-            
-            window->update_results(results);
-            window->update_search_controls(false);
-            
-            delete params;
-            return G_SOURCE_REMOVE;
-        }, new std::pair<MainWindow*, std::vector<FileSearchResult>>(this, std::move(cpp_results)));
-        
-        orion_free_search_results(results);
+void MainWindow::perform_search(const std::string &query,
+                                const std::string &directory) {
+  orion_search_results_t *results = orion_search_files(
+      query.c_str(), directory.c_str(), progress_callback, this);
+  if (results && !should_cancel) {
+    std::vector<FileSearchResult> cpp_results;
+    for (int i = 0; i < results->count; i++) {
+      cpp_results.push_back(FileSearchResult{results->results[i].path});
     }
-    
-    if (should_cancel) {
-        gdk_threads_add_idle([](gpointer data) -> gboolean {
-            auto window = static_cast<MainWindow*>(data);
-            window->update_search_controls(false);
-            return G_SOURCE_REMOVE;
-        }, this);
-    }
+
+    gdk_threads_add_idle(
+        [](gpointer data) -> gboolean {
+          auto params = static_cast<
+              std::pair<MainWindow *, std::vector<FileSearchResult>> *>(data);
+          auto [window, results] = *params;
+
+          window->update_results(results);
+          window->update_search_controls(false);
+
+          delete params;
+          return G_SOURCE_REMOVE;
+        },
+        new std::pair<MainWindow *, std::vector<FileSearchResult>>(
+            this, std::move(cpp_results)));
+
+    orion_free_search_results(results);
+  }
+
+  if (should_cancel) {
+    gdk_threads_add_idle(
+        [](gpointer data) -> gboolean {
+          auto window = static_cast<MainWindow *>(data);
+          window->update_search_controls(false);
+          return G_SOURCE_REMOVE;
+        },
+        this);
+  }
 }
 
-void MainWindow::update_results(const std::vector<FileSearchResult>& results) {
-    GtkTreeIter iter;
-    for (const auto& result : results) {
-        gtk_list_store_append(list_store, &iter);
-        gtk_list_store_set(list_store, &iter, 0, result.path.c_str(), -1);
-    }
+void MainWindow::update_results(const std::vector<FileSearchResult> &results) {
+  GtkTreeIter iter;
+  for (const auto &result : results) {
+    gtk_list_store_append(list_store, &iter);
+    gtk_list_store_set(list_store, &iter, 0, result.path.c_str(), -1);
+  }
 }
 
-void MainWindow::on_search_clicked(GtkButton* button, gpointer user_data) {
-    MainWindow* window = static_cast<MainWindow*>(user_data);
-    window->start_search();
+void MainWindow::on_search_clicked(GtkButton *button, gpointer user_data) {
+  MainWindow *window = static_cast<MainWindow *>(user_data);
+  window->start_search();
 }
 
-void MainWindow::on_cancel_clicked(GtkButton* button, gpointer user_data) {
-    MainWindow* window = static_cast<MainWindow*>(user_data);
-    window->cancel_search();
+void MainWindow::on_cancel_clicked(GtkButton *button, gpointer user_data) {
+  MainWindow *window = static_cast<MainWindow *>(user_data);
+  window->cancel_search();
 }
 
-void MainWindow::on_row_activated(GtkTreeView* tree_view, GtkTreePath* path,
-                               GtkTreeViewColumn* column, gpointer user_data) {
-    MainWindow* window = static_cast<MainWindow*>(user_data);
-    GtkTreeIter iter;
-    GtkTreeModel* model = gtk_tree_view_get_model(tree_view);
+void MainWindow::on_row_activated(GtkTreeView *tree_view, GtkTreePath *path,
+                                  GtkTreeViewColumn *column,
+                                  gpointer user_data) {
+  MainWindow *window = static_cast<MainWindow *>(user_data);
+  GtkTreeIter iter;
+  GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
 
-    if (gtk_tree_model_get_iter(model, &iter, path)) {
-        gchar* file_path;
-        gtk_tree_model_get(model, &iter, 0, &file_path, -1);
-        orion_open_in_finder(file_path);
-        g_free(file_path);
-    }
+  if (gtk_tree_model_get_iter(model, &iter, path)) {
+    gchar *file_path;
+    gtk_tree_model_get(model, &iter, 0, &file_path, -1);
+    orion_open_in_finder(file_path);
+    g_free(file_path);
+  }
 }
