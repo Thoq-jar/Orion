@@ -9,14 +9,15 @@ import SwiftUI
 import OrionKit
 
 struct ContentView: View {
+    @State public var isSearching = false
+    @State public var searchTask: Task<Void, Never>?
     @State private var searchQuery = ""
     @State private var searchPath = FileManager.default.homeDirectoryForCurrentUser.path
     @State private var fileExtension = ""
     @State private var searchResults: [SearchResult] = []
     @State private var searchProgress: Double = 0
-    @State private var isSearching = false
+    @State private var searchStatus: String = ""
     @State private var errorMessage: String?
-    @State private var searchTask: Task<Void, Never>?
     @State private var selectedResult: SearchResult?
     
     private let searcher = FileSearcher()
@@ -52,7 +53,7 @@ struct ContentView: View {
             
             if isSearching {
                 ProgressView(value: searchProgress) {
-                    Text("Searching... \(Int(searchProgress * 100))%")
+                    Text("\(searchStatus) \(Int(searchProgress * 100))%")
                 }
                 .progressViewStyle(.linear)
                 .padding(.horizontal)
@@ -109,38 +110,36 @@ struct ContentView: View {
         .frame(minWidth: 600, minHeight: 300)
     }
     
-    private func isSelected(result: SearchResult) -> Bool {
-        selectedResult?.id == result.id
-    }
-    
     private func startNewSearch() {
         searchTask?.cancel()
         selectedResult = nil
         searchTask = Task {
             isSearching = true
             searchProgress = 0
+            searchStatus = "Starting search..."
             errorMessage = nil
             searchResults = []
-            
+
             var fullQuery = searchQuery
             if !fileExtension.isEmpty {
                 let ext = fileExtension.hasPrefix(".") ? fileExtension : "." + fileExtension
                 fullQuery += " extension:" + ext
             }
-            
+
             do {
                 searchResults = try await searcher.search(
                     query: fullQuery,
                     in: searchPath
                 ) { progress in
-                    searchProgress = progress
+                    searchProgress = progress.progress
+                    searchStatus = progress.status
                 }
             } catch {
                 if !Task.isCancelled {
                     errorMessage = error.localizedDescription
                 }
             }
-            
+
             if !Task.isCancelled {
                 isSearching = false
             }
@@ -152,6 +151,10 @@ struct ContentView: View {
         searchTask?.cancel()
         searchTask = nil
         isSearching = false
+    }
+    
+    private func isSelected(result: SearchResult) -> Bool {
+        selectedResult?.id == result.id
     }
 }
 
