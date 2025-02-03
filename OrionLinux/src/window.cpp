@@ -24,11 +24,9 @@ void MainWindow::setup_ui() {
   GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_container_add(GTK_CONTAINER(window), vbox);
 
-  // Create menu bar
   GtkWidget *menubar = gtk_menu_bar_new();
   gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
 
-  // File menu
   GtkWidget *file_menu = gtk_menu_new();
   GtkWidget *file_item = gtk_menu_item_new_with_mnemonic("_File");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_item), file_menu);
@@ -38,7 +36,6 @@ void MainWindow::setup_ui() {
   g_signal_connect(quit_item, "activate", G_CALLBACK(gtk_main_quit), NULL);
   gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_item);
 
-  // View menu
   GtkWidget *view_menu = gtk_menu_new();
   GtkWidget *view_item = gtk_menu_item_new_with_mnemonic("_View");
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_item), view_menu);
@@ -48,7 +45,6 @@ void MainWindow::setup_ui() {
   g_signal_connect(dark_mode_item, "toggled", G_CALLBACK(on_dark_mode_toggled), this);
   gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), dark_mode_item);
 
-  // Main content
   GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
   gtk_container_set_border_width(GTK_CONTAINER(content_box), 10);
   gtk_box_pack_start(GTK_BOX(vbox), content_box, TRUE, TRUE, 0);
@@ -182,50 +178,60 @@ static void progress_callback(double progress, void *user_data) {
 }
 
 void MainWindow::perform_search(const std::string &query, const std::string &directory, const std::string &extension) {
-  std::string full_query = query;
-  if (!extension.empty()) {
-    std::string ext = extension;
-    if (!ext.empty() && ext[0] != '.') {
-      ext = "." + ext;
-    }
-    full_query = query + " extension:" + ext;
-  }
-
-  orion_search_results_t *results = orion_search_files(
-      full_query.c_str(), directory.c_str(), progress_callback, this);
-  if (results && !should_cancel) {
-    std::vector<FileSearchResult> cpp_results;
-    for (int i = 0; i < results->count; i++) {
-      cpp_results.push_back(FileSearchResult{results->results[i].path});
+    std::string full_query = query;
+    if (!extension.empty()) {
+        std::string ext = extension;
+        if (!ext.empty() && ext[0] != '.') {
+            ext = "." + ext;
+        }
+        full_query = query + " extension:" + ext;
     }
 
     gdk_threads_add_idle(
         [](gpointer data) -> gboolean {
-          auto params = static_cast<
-              std::pair<MainWindow *, std::vector<FileSearchResult>> *>(data);
-          auto [window, results] = *params;
-
-          window->update_results(results);
-          window->update_search_controls(false);
-
-          delete params;
-          return G_SOURCE_REMOVE;
-        },
-        new std::pair<MainWindow *, std::vector<FileSearchResult>>(
-            this, std::move(cpp_results)));
-
-    orion_free_search_results(results);
-  }
-
-  if (should_cancel) {
-    gdk_threads_add_idle(
-        [](gpointer data) -> gboolean {
-          auto window = static_cast<MainWindow *>(data);
-          window->update_search_controls(false);
-          return G_SOURCE_REMOVE;
+            auto window = static_cast<MainWindow *>(data);
+            gtk_progress_bar_set_text(GTK_PROGRESS_BAR(window->progress_bar), "Parsing...");
+            return G_SOURCE_REMOVE;
         },
         this);
-  }
+
+    orion_search_results_t *results = orion_search_files(
+        full_query.c_str(), directory.c_str(), progress_callback, this);
+
+    if (results && !should_cancel) {
+        std::vector<FileSearchResult> cpp_results;
+        for (int i = 0; i < results->count; i++) {
+            cpp_results.push_back(FileSearchResult{results->results[i].path});
+        }
+
+        gdk_threads_add_idle(
+            [](gpointer data) -> gboolean {
+                auto params = static_cast<
+                    std::pair<MainWindow *, std::vector<FileSearchResult>> *>(data);
+                auto [window, results] = *params;
+
+                gtk_progress_bar_set_text(GTK_PROGRESS_BAR(window->progress_bar), "Search complete");
+                window->update_results(results);
+                window->update_search_controls(false);
+
+                delete params;
+                return G_SOURCE_REMOVE;
+            },
+            new std::pair<MainWindow *, std::vector<FileSearchResult>>(
+                this, std::move(cpp_results)));
+
+        orion_free_search_results(results);
+    }
+
+    if (should_cancel) {
+        gdk_threads_add_idle(
+            [](gpointer data) -> gboolean {
+                auto window = static_cast<MainWindow *>(data);
+                window->update_search_controls(false);
+                return G_SOURCE_REMOVE;
+            },
+            this);
+    }
 }
 
 void MainWindow::update_results(const std::vector<FileSearchResult> &results) {
@@ -303,7 +309,6 @@ void MainWindow::apply_theme(bool dark_mode) {
   GtkStyleContext *progress_context = gtk_widget_get_style_context(progress_bar);
   
   if (dark_mode) {
-    // Set dark theme colors for progress bar
     GtkCssProvider *provider = gtk_css_provider_new();
     const char *css = 
       "progressbar progress { background-color: #00ff00; }"
@@ -314,10 +319,8 @@ void MainWindow::apply_theme(bool dark_mode) {
                                  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
 
-    // Set dark theme for GTK
     g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", TRUE, NULL);
   } else {
-    // Set light theme colors for progress bar
     GtkCssProvider *provider = gtk_css_provider_new();
     const char *css = 
       "progressbar progress { background-color: #00ff00; }"
@@ -328,7 +331,6 @@ void MainWindow::apply_theme(bool dark_mode) {
                                  GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
 
-    // Set light theme for GTK
     g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", FALSE, NULL);
   }
 }
