@@ -17,6 +17,7 @@
 #define IDC_PROGRESS 107
 #define IDC_RESULTS 108
 #define IDC_ERROR 109
+#define IDC_STATUS 110
 
 #define IDM_FILE_EXIT 201
 #define IDM_VIEW_DARKMODE 202
@@ -227,6 +228,15 @@ void MainWindow::CreateControls() {
         GetModuleHandle(nullptr), nullptr
     );
 
+    m_statusLabel = CreateWindowEx(
+        0, L"STATIC", L"",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        margin, margin + 2 * controlHeight + 20,
+        static_cast<int>(700 * dpiScale), controlHeight,
+        m_hwnd, (HMENU)IDC_STATUS,
+        GetModuleHandle(nullptr), nullptr
+    );
+
     HFONT hFont = CreateFont(
         -static_cast<int>(14 * dpiScale), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
@@ -242,6 +252,7 @@ void MainWindow::CreateControls() {
     SendMessage(m_browseButton, WM_SETFONT, (WPARAM)hFont, TRUE);
     SendMessage(m_resultsList, WM_SETFONT, (WPARAM)hFont, TRUE);
     SendMessage(m_errorText, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(m_statusLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
     wchar_t currentPath[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, currentPath);
@@ -479,63 +490,56 @@ void MainWindow::UpdateProgress(double progress) {
 
 void MainWindow::PerformSearch(const std::wstring& query, const std::wstring& directory,
                              const std::wstring& extension) {
-    try {
-        std::string utf8Query;
-        std::string utf8Directory;
-        int querySize = WideCharToMultiByte(CP_UTF8, 0, query.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        int dirSize = WideCharToMultiByte(CP_UTF8, 0, directory.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        
-        if (querySize > 0 && dirSize > 0) {
-            utf8Query.resize(querySize);
-            utf8Directory.resize(dirSize);
-            WideCharToMultiByte(CP_UTF8, 0, query.c_str(), -1, &utf8Query[0], querySize, nullptr, nullptr);
-            WideCharToMultiByte(CP_UTF8, 0, directory.c_str(), -1, &utf8Directory[0], dirSize, nullptr, nullptr);
-            
-            utf8Query.pop_back();
-            utf8Directory.pop_back();
-        } else {
-            throw std::runtime_error("Failed to convert strings to UTF-8");
-        }
+    std::vector<SearchResult> results;
+    std::error_code ec;
 
-        if (!extension.empty()) {
-            std::string utf8Extension;
-            int extSize = WideCharToMultiByte(CP_UTF8, 0, extension.c_str(), -1, nullptr, 0, nullptr, nullptr);
-            if (extSize > 0) {
-                utf8Extension.resize(extSize);
-                WideCharToMultiByte(CP_UTF8, 0, extension.c_str(), -1, &utf8Extension[0], extSize, nullptr, nullptr);
-                utf8Extension.pop_back();
-                if (utf8Extension[0] != '.') {
-                    utf8Extension = "." + utf8Extension;
-                }
-                utf8Query += " extension:" + utf8Extension;
+    try {
+        auto dirIter = std::filesystem::recursive_directory_iterator(
+            directory,
+            std::filesystem::directory_options::skip_permission_denied
+        );
+
+        std::vector<std::filesystem::path> allFiles;
+        for (const auto& entry : dirIter) {
+            if (m_shouldCancel) return;
+            
+            std::error_code ec;
+            if (entry.is_regular_file(ec)) {
+                allFiles.push_back(entry.path());
             }
         }
 
-        std::replace(utf8Directory.begin(), utf8Directory.end(), '\\', '/');
+        size_t totalFiles = allFiles.size();
+        size_t processedFiles = 0;
 
-        orion_search_results_t* results = orion_search_files(
-            utf8Query.c_str(), 
-            utf8Directory.c_str(),
-            [](double progress, void* userData) {
-                auto window = static_cast<MainWindow*>(userData);
-                window->PostMessage(WM_USER + 1, static_cast<WPARAM>(progress * 100), 0);
-            },
-            this
-        );
+        for (const auto& file : allFiles) {
+            if (m_shouldCancel) return;
 
-        if (results && !m_shouldCancel) {
-            for (int i = 0; i < results->count; i++) {
-                const char* utf8Path = results->results[i].path;
-                int wideSize = MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, nullptr, 0);
-                if (wideSize > 0) {
-                    std::wstring widePath(wideSize - 1, L'\0');
-                    if (MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, &widePath[0], wideSize) > 0) {
-                        std::replace(widePath.begin(), widePath.end(), L'/', L'\\');
-                        
-                        SearchResult result;
-                        result.path = widePath;
-                        result.id = std::to_wstring(m_searchResults.size());
-                        m_searchResults.push_back(result);
+            try {
+                if (!extension.empty()) {
+                    std::wstring fileExt = file.extension().wstring();
+                    std::wstring searchExt = extension[0] == L'.' ? extension : L"." + extension;
+                    if (_wcsicmp(fileExt.c_str(), searchExt.c_str()) != 0) {
+                        processedFiles++;
+                        double progress = static_cast<double>(processedFiles) / totalFiles;
+                        PostMessage(m_hwnd, WM_USER + 1, static_cast<WPARAM>(progress * 100), 0);
+                        continue;
+                    }
+                }
+
+                std::wstring filename = file.filename().wstring();
+                std::wstring lowerFilename;
+                std::wstring lowerQuery;
+                lowerFilename.resize(filename.size());
+                lowerQuery.resize(query.size());
+                std::transform(filename.begin(), filename.end(), lowerFilename.begin(), ::towlower);
+                std::transform(query.begin(), query.end(), lowerQuery.begin(), ::towlower);
+
+                if (lowerFilename.find(lowerQuery) != std::wstring::npos) {
+                    SearchResult result;
+                    result.path = file.wstring();
+                    result.id = std::to_wstring(results.size());
+                    results.push_back(result);
 
                         SendMessage(m_resultsList, LB_ADDSTRING, 0,
                                 reinterpret_cast<LPARAM>(result.path.c_str()));

@@ -10,14 +10,16 @@ let package = Package(
         .library(
             name: "OrionKit",
             type: .dynamic,
-            targets: ["OrionKit", "COrionKit"]),
+            targets: ["OrionKit"]),
     ],
     targets: [
         .target(
-            name: "COrionKit",
-            publicHeadersPath: "include"),
-        .target(
             name: "OrionKit",
-            dependencies: ["COrionKit"])
+            dependencies: ["COrionKit"]
+        ),
+        .target(
+            name: "COrionKit",
+            dependencies: []
+        )
     ]
 )
