@@ -22,7 +22,7 @@ swift build --package-path OrionMac
 ```
 
 ### Windows
-Comming soon™
+Follow the instructions in the [Windows guide](docs/WindowsDev.md)
 
 ## Running
 ### Linux
@@ -36,7 +36,7 @@ swift run --package-path OrionMac
 ```
 
 ### Windows
-Comming soon™
+Follow the instructions in the [Windows guide](docs/WindowsDev.md)
 
 ## Notes
 The Linux build also runs on macOS. If you prefer GTK look and feel, it should work out of the box.

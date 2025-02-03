@@ -29,6 +29,7 @@ private:
   GtkWidget *cancel_button;
   GtkWidget *progress_bar;
   GtkWidget *results_list;
+  GtkWidget *dark_mode_item;
   GtkListStore *list_store;
   bool is_searching;
   std::atomic<bool> should_cancel;
@@ -44,8 +45,13 @@ private:
   void update_results(const std::vector<FileSearchResult> &results);
   void update_search_controls(bool searching);
 
+  void load_theme_preference();
+  void save_theme_preference(bool dark_mode);
+  void apply_theme(bool dark_mode);
+
   static void on_search_clicked(GtkButton *button, gpointer user_data);
   static void on_cancel_clicked(GtkButton *button, gpointer user_data);
   static void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path,
                                GtkTreeViewColumn *column, gpointer user_data);
+  static void on_dark_mode_toggled(GtkCheckMenuItem *menuitem, gpointer user_data);
 };

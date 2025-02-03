@@ -15,11 +15,8 @@ A Windows version of the Orion file search application using WinUI 3.
 
 ## Building
 
-1. Open Visual Studio 2022
-2. Select "Open a local folder" and navigate to the OrionWindows directory
-3. Visual Studio will automatically detect the CMake project
-4. Select x64-Debug or x64-Release from the configuration dropdown
-5. Build the project (F7 or Build > Build All)
+1. Run `scripts/build.cmd` inside a Developer Command Prompt for VS 2022 window.
+2. Run out/OrionWindows.exe or rename it to Orion.exe and run it.
 
 ## Features
 

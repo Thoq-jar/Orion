@@ -1,8 +1,11 @@
 #include "window.hpp"
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 MainWindow::MainWindow() : is_searching(false), should_cancel(false) {
   setup_ui();
+  load_theme_preference();
 }
 
 MainWindow::~MainWindow() {
@@ -18,12 +21,40 @@ void MainWindow::setup_ui() {
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
   g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
-  GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+  GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_container_add(GTK_CONTAINER(window), vbox);
-  gtk_container_set_border_width(GTK_CONTAINER(vbox), 10);
+
+  // Create menu bar
+  GtkWidget *menubar = gtk_menu_bar_new();
+  gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
+
+  // File menu
+  GtkWidget *file_menu = gtk_menu_new();
+  GtkWidget *file_item = gtk_menu_item_new_with_mnemonic("_File");
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(file_item), file_menu);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar), file_item);
+
+  GtkWidget *quit_item = gtk_menu_item_new_with_mnemonic("_Quit");
+  g_signal_connect(quit_item, "activate", G_CALLBACK(gtk_main_quit), NULL);
+  gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), quit_item);
+
+  // View menu
+  GtkWidget *view_menu = gtk_menu_new();
+  GtkWidget *view_item = gtk_menu_item_new_with_mnemonic("_View");
+  gtk_menu_item_set_submenu(GTK_MENU_ITEM(view_item), view_menu);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menubar), view_item);
+
+  dark_mode_item = gtk_check_menu_item_new_with_mnemonic("_Dark Mode");
+  g_signal_connect(dark_mode_item, "toggled", G_CALLBACK(on_dark_mode_toggled), this);
+  gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), dark_mode_item);
+
+  // Main content
+  GtkWidget *content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+  gtk_container_set_border_width(GTK_CONTAINER(content_box), 10);
+  gtk_box_pack_start(GTK_BOX(vbox), content_box, TRUE, TRUE, 0);
 
   GtkWidget *search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-  gtk_box_pack_start(GTK_BOX(vbox), search_box, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(content_box), search_box, FALSE, FALSE, 0);
 
   GtkWidget *path_label = gtk_label_new("Search in:");
   gtk_box_pack_start(GTK_BOX(search_box), path_label, FALSE, FALSE, 0);
@@ -59,7 +90,7 @@ void MainWindow::setup_ui() {
   gtk_widget_set_sensitive(cancel_button, FALSE);
 
   progress_bar = gtk_progress_bar_new();
-  gtk_box_pack_start(GTK_BOX(vbox), progress_bar, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(content_box), progress_bar, FALSE, FALSE, 0);
 
   list_store = gtk_list_store_new(1, G_TYPE_STRING);
   results_list = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list_store));
@@ -74,7 +105,7 @@ void MainWindow::setup_ui() {
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window),
                                  GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
   gtk_container_add(GTK_CONTAINER(scrolled_window), results_list);
-  gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
+  gtk_box_pack_start(GTK_BOX(content_box), scrolled_window, TRUE, TRUE, 0);
 
   g_signal_connect(results_list, "row-activated", G_CALLBACK(on_row_activated),
                    this);
@@ -228,4 +259,83 @@ void MainWindow::on_row_activated(GtkTreeView *tree_view, GtkTreePath *path,
     orion_open_in_finder(file_path);
     g_free(file_path);
   }
+}
+
+void MainWindow::load_theme_preference() {
+  std::string config_dir = std::string(g_get_user_config_dir()) + "/orion";
+  std::string config_file = config_dir + "/settings.conf";
+
+  try {
+    std::filesystem::create_directories(config_dir);
+    std::ifstream file(config_file);
+    if (file.is_open()) {
+      std::string line;
+      while (std::getline(file, line)) {
+        if (line.find("dark_mode=") == 0) {
+          bool dark_mode = (line == "dark_mode=1");
+          gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(dark_mode_item), dark_mode);
+          apply_theme(dark_mode);
+          break;
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "Error loading theme preference: " << e.what() << std::endl;
+  }
+}
+
+void MainWindow::save_theme_preference(bool dark_mode) {
+  std::string config_dir = std::string(g_get_user_config_dir()) + "/orion";
+  std::string config_file = config_dir + "/settings.conf";
+
+  try {
+    std::filesystem::create_directories(config_dir);
+    std::ofstream file(config_file);
+    if (file.is_open()) {
+      file << "dark_mode=" << (dark_mode ? "1" : "0") << std::endl;
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "Error saving theme preference: " << e.what() << std::endl;
+  }
+}
+
+void MainWindow::apply_theme(bool dark_mode) {
+  GtkStyleContext *progress_context = gtk_widget_get_style_context(progress_bar);
+  
+  if (dark_mode) {
+    // Set dark theme colors for progress bar
+    GtkCssProvider *provider = gtk_css_provider_new();
+    const char *css = 
+      "progressbar progress { background-color: #00ff00; }"
+      "progressbar trough { background-color: #323232; }";
+    gtk_css_provider_load_from_data(provider, css, -1, NULL);
+    gtk_style_context_add_provider(progress_context, 
+                                 GTK_STYLE_PROVIDER(provider), 
+                                 GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
+
+    // Set dark theme for GTK
+    g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", TRUE, NULL);
+  } else {
+    // Set light theme colors for progress bar
+    GtkCssProvider *provider = gtk_css_provider_new();
+    const char *css = 
+      "progressbar progress { background-color: #00ff00; }"
+      "progressbar trough { background-color: #c8c8c8; }";
+    gtk_css_provider_load_from_data(provider, css, -1, NULL);
+    gtk_style_context_add_provider(progress_context, 
+                                 GTK_STYLE_PROVIDER(provider), 
+                                 GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
+
+    // Set light theme for GTK
+    g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", FALSE, NULL);
+  }
+}
+
+void MainWindow::on_dark_mode_toggled(GtkCheckMenuItem *menuitem, gpointer user_data) {
+  MainWindow *window = static_cast<MainWindow *>(user_data);
+  bool dark_mode = gtk_check_menu_item_get_active(menuitem);
+  window->apply_theme(dark_mode);
+  window->save_theme_preference(dark_mode);
 }
