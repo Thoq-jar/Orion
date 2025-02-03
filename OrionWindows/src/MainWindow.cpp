@@ -17,6 +17,7 @@
 #define IDC_PROGRESS 107
 #define IDC_RESULTS 108
 #define IDC_ERROR 109
+#define IDC_STATUS 110
 
 #define IDM_FILE_EXIT 201
 #define IDM_VIEW_DARKMODE 202
@@ -227,6 +228,15 @@ void MainWindow::CreateControls() {
         GetModuleHandle(nullptr), nullptr
     );
 
+    m_statusLabel = CreateWindowEx(
+        0, L"STATIC", L"",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        margin, margin + 2 * controlHeight + 20,
+        static_cast<int>(700 * dpiScale), controlHeight,
+        m_hwnd, (HMENU)IDC_STATUS,
+        GetModuleHandle(nullptr), nullptr
+    );
+
     HFONT hFont = CreateFont(
         -static_cast<int>(14 * dpiScale), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
@@ -242,6 +252,7 @@ void MainWindow::CreateControls() {
     SendMessage(m_browseButton, WM_SETFONT, (WPARAM)hFont, TRUE);
     SendMessage(m_resultsList, WM_SETFONT, (WPARAM)hFont, TRUE);
     SendMessage(m_errorText, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(m_statusLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
 
     wchar_t currentPath[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, currentPath);

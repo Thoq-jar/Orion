@@ -6,6 +6,7 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include "../../OrionKit/Sources/OrionKit/include/bridge.h"
 
 struct SearchResult {
     std::wstring path;
@@ -19,6 +20,7 @@ public:
 
     bool Create();
     HWND GetHandle() const { return m_hwnd; }
+    void Show() { ShowWindow(m_hwnd, SW_SHOW); }
 
 private:
     // Window handles
@@ -32,6 +34,7 @@ private:
     HWND m_progressBar;
     HWND m_resultsList;
     HWND m_errorText;
+    HWND m_statusLabel;
 
     // Search state
     std::atomic<bool> m_shouldCancel;
