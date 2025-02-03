@@ -16,7 +16,9 @@ typedef struct {
     int32_t count;
 } orion_search_results_t;
 
-orion_search_results_t* orion_search_files(const char* query, const char* directory);
+typedef void (*orion_progress_callback)(double progress, void* user_data);
+
+orion_search_results_t* orion_search_files(const char* query, const char* directory, orion_progress_callback progress_cb, void* user_data);
 void orion_free_search_results(orion_search_results_t* results);
 void orion_open_in_finder(const char* path);
 
