@@ -1,6 +1,16 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
+#if os(Windows)
+let linkerSettings: [LinkerSetting] = [
+    .linkedLibrary("ucrt"),
+    .linkedLibrary("vcruntime"),
+    .linkedLibrary("msvcrt")
+]
+#else
+let linkerSettings: [LinkerSetting] = []
+#endif
+
 let package = Package(
     name: "OrionKit",
     platforms: [
@@ -10,14 +20,17 @@ let package = Package(
         .library(
             name: "OrionKit",
             type: .dynamic,
-            targets: ["OrionKit", "COrionKit"]),
+            targets: ["OrionKit"]),
     ],
     targets: [
         .target(
-            name: "COrionKit",
-            publicHeadersPath: "include"),
-        .target(
             name: "OrionKit",
-            dependencies: ["COrionKit"])
+            dependencies: ["COrionKit"],
+            linkerSettings: linkerSettings
+        ),
+        .target(
+            name: "COrionKit",
+            dependencies: []
+        )
     ]
 )
