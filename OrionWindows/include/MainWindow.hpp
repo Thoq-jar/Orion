@@ -1,12 +1,14 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commctrl.h>
 #include <string>
 #include <vector>
 #include <thread>
 #include <atomic>
-#include "../../OrionKit/Sources/OrionKit/include/bridge.h"
+
+#include "bridge.h"
 
 struct SearchResult {
     std::wstring path;
@@ -23,6 +25,11 @@ public:
     void Show() { ShowWindow(m_hwnd, SW_SHOW); }
 
 private:
+    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void CreateControls();
+    void SetupLayout();
+
     // Window handles
     HWND m_hwnd;
     HWND m_searchQueryEdit;
@@ -43,11 +50,7 @@ private:
     double m_searchProgress;
     bool m_isSearching;
 
-    // Window procedure
-    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-    // UI Event handlers
+    // Event handlers
     void OnSearchButtonClick();
     void OnCancelButtonClick();
     void OnBrowseButtonClick();
@@ -58,10 +61,5 @@ private:
     void CancelSearch();
     void PerformSearch(const std::wstring& query, const std::wstring& directory, const std::wstring& extension);
     void UpdateProgress(double progress);
-    void UpdateSearchResults(const std::vector<SearchResult>& results);
     void ShowError(const std::wstring& message);
-
-    // Helper methods
-    void CreateControls();
-    void SetupLayout();
 }; 
